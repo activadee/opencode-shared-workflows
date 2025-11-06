@@ -1,0 +1,35 @@
+{
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "description": "High-level summary of the review findings."
+    },
+    "comments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "File path relative to the repository root."
+          },
+          "line": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Line number in the diff hunk."
+          },
+          "body": {
+            "type": "string",
+            "description": "Markdown-formatted inline comment describing the issue."
+          }
+        },
+        "required": ["path", "line", "body"],
+        "additionalProperties": false
+      },
+      "description": "Collection of inline review comments produced by Codex."
+    }
+  },
+  "required": ["summary", "comments"],
+  "additionalProperties": false
+}
