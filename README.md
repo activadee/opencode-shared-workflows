@@ -112,7 +112,7 @@ Required secrets for `release.yml`:
 | `test_flags` | `./...` | Flags passed to `go test`. |
 | `download_artifacts` | `false` | Download workflow artifacts before publishing the release. |
 | `artifacts_path` | `release-artifacts` | Directory for downloaded artifacts. |
-| `artifact_glob` | _empty_ | Glob (relative to `artifacts_path`) uploaded with the release. |
+| `artifact_glob` | _empty_ | Newline-delimited glob(s) (relative to the workspace after download) uploaded with the release. |
 
 Outputs:
 

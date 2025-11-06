@@ -186,4 +186,4 @@ jobs:
           name: ${{ inputs.release_title || inputs.tag_name }}
           draft: ${{ inputs.draft }}
           body_path: release-notes.md
-          files: ${{ inputs.download_artifacts && inputs.artifact_glob != '' && format('{0}/{1}', inputs.artifacts_path, inputs.artifact_glob) || '' }}
+          files: ${{ inputs.download_artifacts && inputs.artifact_glob != '' && inputs.artifact_glob || '' }}
