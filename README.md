@@ -30,7 +30,6 @@ jobs:
     uses: activadee/codex-shared-workflows/.github/workflows/codex-review.yml@v1
     secrets: inherit
     with:
-      codex_action_ref: v1
       prompt_extra: |
         Prioritize security regressions and user-facing bugs.
 ```
@@ -59,7 +58,6 @@ jobs:
       target: main
       release_title: Codex SDK v0.2.0
       draft: false
-      codex_action_ref: v1
 ```
 
 ### Secrets
@@ -81,7 +79,6 @@ Required secrets for `release.yml`:
 
 | Input | Default | Notes |
 | --- | --- | --- |
-| `codex_action_ref` | `main` | Tag/branch/SHA for `activadee/codex-action`. |
 | `safety_strategy` | `drop-sudo` | Passed through to the action. |
 | `prompt_extra` | _empty_ | Additional markdown appended to the shared prompt. |
 | `model` / `effort` | _empty_ | Optional overrides for Codex model and reasoning effort. |
@@ -106,7 +103,6 @@ Required secrets for `release.yml`:
 | `release_title` | _empty_ | Optional display name (falls back to tag). |
 | `target` | `main` | Commit/branch to release. |
 | `draft` | `false` | Whether to create the release as a draft. |
-| `codex_action_ref` | `main` | Ref for `activadee/codex-action`. |
 | `go_version` | _empty_ | Explicit Go version; ignored if `go_version_file` is provided. |
 | `go_version_file` | `go.mod` | File declaring Go version. |
 | `run_tests` | `true` | Run `go test` before release. |

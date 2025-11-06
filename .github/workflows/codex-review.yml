@@ -3,11 +3,6 @@ name: Codex Review
 on:
   workflow_call:
     inputs:
-      codex_action_ref:
-        description: Ref for activadee/codex-action (branch, tag, or SHA).
-        required: false
-        type: string
-        default: main
       safety_strategy:
         description: Safety strategy passed to codex-action (drop-sudo/read-only/unprivileged-user/unsafe).
         required: false
@@ -114,7 +109,7 @@ jobs:
 
       - name: Run Codex review
         id: run_codex
-        uses: activadee/codex-action@${{ inputs.codex_action_ref }}
+        uses: activadee/codex-action@main
         with:
           codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
           safety-strategy: ${{ inputs.safety_strategy }}
