@@ -48,6 +48,21 @@ on:
         required: false
         type: string
         default: ./...
+      download_artifacts:
+        description: Download artifacts produced by earlier jobs before publishing release.
+        required: false
+        type: boolean
+        default: false
+      artifacts_path:
+        description: Directory where downloaded artifacts will be stored.
+        required: false
+        type: string
+        default: release-artifacts
+      artifact_glob:
+        description: File glob (relative to artifacts_path) to upload with the release.
+        required: false
+        type: string
+        default: ""
     outputs:
       release_notes:
         description: Rendered release notes content.
@@ -156,6 +171,13 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Download build artifacts
+        if: inputs.download_artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ${{ inputs.artifacts_path }}
+          merge-multiple: true
+
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v1
         with:
@@ -164,3 +186,4 @@ jobs:
           name: ${{ inputs.release_title || inputs.tag_name }}
           draft: ${{ inputs.draft }}
           body_path: release-notes.md
+          files: ${{ inputs.download_artifacts && inputs.artifact_glob != '' && format('{0}/{1}', inputs.artifacts_path, inputs.artifact_glob) || '' }}

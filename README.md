@@ -110,6 +110,9 @@ Required secrets for `release.yml`:
 | `go_version_file` | `go.mod` | File declaring Go version. |
 | `run_tests` | `true` | Run `go test` before release. |
 | `test_flags` | `./...` | Flags passed to `go test`. |
+| `download_artifacts` | `false` | Download workflow artifacts before publishing the release. |
+| `artifacts_path` | `release-artifacts` | Directory for downloaded artifacts. |
+| `artifact_glob` | _empty_ | Glob (relative to `artifacts_path`) uploaded with the release. |
 
 Outputs:
 
