@@ -29,6 +29,11 @@ on:
         required: false
         type: boolean
         default: true
+      pre_test:
+        description: Optional shell script to run before go test.
+        required: false
+        type: string
+        default: ""
     secrets: {}
 
 permissions:
@@ -47,6 +52,11 @@ jobs:
           go-version: ${{ inputs.go_version }}
           go-version-file: ${{ inputs.go_version_file }}
           cache: ${{ inputs.enable_cache }}
+
+      - name: Pre-test setup
+        if: inputs.pre_test != ''
+        working-directory: ${{ inputs.working_directory }}
+        run: ${{ inputs.pre_test }}
 
       - name: Run go test
         working-directory: ${{ inputs.working_directory }}

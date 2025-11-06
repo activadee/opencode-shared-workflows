@@ -96,6 +96,7 @@ Required secrets for `release.yml`:
 | `working_directory` | `.` | Directory where `go test` runs. |
 | `test_flags` | `./...` | Flags appended to `go test`. |
 | `enable_cache` | `true` | Toggle `actions/setup-go` module cache. |
+| `pre_test` | _empty_ | Optional shell snippet executed before `go test`. |
 
 `release.yml` inputs:
 
