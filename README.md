@@ -13,6 +13,9 @@ Reusable GitHub Actions workflows for Codex-enabled repositories. These workflow
 - `.github/workflows/release.yml`  
   Generates release notes with Codex and publishes a GitHub release, optionally running `go test` first.
 
+- `.github/workflows/auto-label.yml`  
+  Calls Codex to suggest up to three labels for new or updated issues, creating labels when needed.
+
 ## Using the workflows
 
 Create a workflow in another repository and reference the desired file via `uses`. Pin to a tag or commit once published.
@@ -32,6 +35,12 @@ jobs:
     with:
       prompt_extra: |
         Prioritize security regressions and user-facing bugs.
+
+  auto-label:
+    uses: activadee/codex-shared-workflows/.github/workflows/auto-label.yml@v1
+    secrets: inherit
+    with:
+      max_labels: 3
 ```
 
 ```yaml
@@ -71,6 +80,10 @@ Required secrets for `codex-review.yml`:
 Required secrets for `release.yml`:
 
 - `CODEX_AUTH_JSON_B64` – Shared Codex credentials for generating release notes.
+
+Required secrets for `auto-label.yml`:
+
+- `CODEX_AUTH_JSON_B64` – Codex credentials for label generation.
 
 ### Optional inputs
 
@@ -113,6 +126,12 @@ Required secrets for `release.yml`:
 Outputs:
 
 - `release_notes` – Markdown generated for the release.
+
+`auto-label.yml` inputs:
+
+| Input | Default | Notes |
+| --- | --- | --- |
+| `max_labels` | `3` | Upper bound (1–3) on labels applied to each issue. |
 
 ## Repository layout
 
