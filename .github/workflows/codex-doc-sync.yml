@@ -41,73 +41,139 @@ permissions:
   contents: write
   pull-requests: write
 
-concurrency:
-  group: codex-doc-sync-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
-  cancel-in-progress: true
+env:
+  DOC_REPORT_PATH: doc-sync-report.md
+  DOC_COMMITS_PATH: doc-commits.md
+  DOC_GLOBS_FILE: doc-globs.txt
+  DOC_PATCH_FILE: doc-changes.patch
 
 jobs:
-  docs:
-    if: github.event.pull_request != null || github.event.issue.pull_request != null
+  prepare_inputs:
     runs-on: ubuntu-latest
     env:
-      DOC_REPORT_PATH: doc-sync-report.md
-      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DOC_INPUTS_ARTIFACT: doc-sync-inputs-${{ github.run_id }}
+    outputs:
+      proceed: ${{ steps.context.outputs.proceed }}
+      reason: ${{ steps.context.outputs.proceed_reason }}
+      base_ref: ${{ steps.context.outputs.base_ref }}
+      head_ref: ${{ steps.context.outputs.head_ref }}
+      head_sha: ${{ steps.context.outputs.head_sha }}
+      pr_number: ${{ steps.context.outputs.number }}
+      repository: ${{ steps.context.outputs.repository }}
+      inputs_artifact: ${{ env.DOC_INPUTS_ARTIFACT }}
     steps:
       - name: Resolve pull request context
-        id: pr_context
-        uses: actions/github-script@v7
+        id: context
+        uses: ./.github/actions/doc-sync-context
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const repoFull = `${owner}/${repo}`;
 
-            let pr = context.payload.pull_request;
-            if (!pr && context.payload.issue?.pull_request) {
-              const response = await github.rest.pulls.get({
-                owner,
-                repo,
-                pull_number: context.payload.issue.number,
-              });
-              pr = response.data;
-            }
-
-            if (!pr) {
-              core.setOutput('proceed', 'false');
-              core.info('No pull request context detected; skipping doc sync.');
-              return;
-            }
-
-            const headRepoFull = pr.head.repo?.full_name || '';
-            const sameRepo = headRepoFull === repoFull;
-            if (!sameRepo) {
-              core.info(`Skipping doc sync because head repository ${headRepoFull || '(unknown)'} differs from ${repoFull}.`);
-            }
-
-            core.setOutput('proceed', sameRepo ? 'true' : 'false');
-            core.setOutput('number', String(pr.number));
-            core.setOutput('base_ref', pr.base?.ref || '');
-            core.setOutput('head_ref', pr.head?.ref || '');
-            core.setOutput('head_sha', pr.head?.sha || '');
-            core.setOutput('repository', repoFull);
+      - name: Abort when doc sync is skipped
+        if: steps.context.outputs.proceed != 'true'
+        run: | 
+            echo "Doc sync skipped: ${{ steps.context.outputs.proceed_reason }}"
 
       - name: Checkout target repository
-        if: steps.pr_context.outputs.proceed == 'true'
+        if: steps.context.outputs.proceed == 'true'
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          ref: ${{ steps.pr_context.outputs.head_sha }}
+          ref: ${{ steps.context.outputs.head_sha }}
 
-      - name: Ignore helper files
-        if: steps.pr_context.outputs.proceed == 'true'
+      - name: Checkout shared workflow assets
+        if: steps.context.outputs.proceed == 'true'
+        uses: actions/checkout@v5
+        with:
+          repository: activadee/codex-shared-workflows
+          ref: main
+          path: __codex_shared
+
+      - name: Prepare workspace
+        if: steps.context.outputs.proceed == 'true'
+        uses: ./.github/actions/doc-sync-prepare
+        with:
+          base_ref: ${{ steps.context.outputs.base_ref }}
+          head_sha: ${{ steps.context.outputs.head_sha }}
+          doc_report_path: ${{ env.DOC_REPORT_PATH }}
+          doc_commits_path: ${{ env.DOC_COMMITS_PATH }}
+          doc_globs_file: ${{ env.DOC_GLOBS_FILE }}
+          doc_globs: ${{ inputs.doc_globs }}
+          shared_path: __codex_shared
+
+      - name: Build Codex prompt
+        if: steps.context.outputs.proceed == 'true'
+        uses: ./.github/actions/doc-sync-build-prompt
+        with:
+          base_ref: ${{ steps.context.outputs.base_ref }}
+          head_ref: ${{ steps.context.outputs.head_ref }}
+          pr_number: ${{ steps.context.outputs.number }}
+          repository: ${{ steps.context.outputs.repository }}
+          report_path: ${{ env.DOC_REPORT_PATH }}
+          template_path: __codex_shared/.github/prompts/codex-doc-sync.md
+          doc_globs_path: ${{ env.DOC_GLOBS_FILE }}
+          prompt_path: codex_prompt.md
+          commits_path: ${{ env.DOC_COMMITS_PATH }}
+          shared_path: __codex_shared
+
+      - name: Upload doc-sync inputs
+        if: steps.context.outputs.proceed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DOC_INPUTS_ARTIFACT }}
+          retention-days: 7
+          path: |
+            codex_prompt.md
+            ${{ env.DOC_GLOBS_FILE }}
+            ${{ env.DOC_COMMITS_PATH }}
+
+  edit_docs:
+    needs: prepare_inputs
+    if: needs.prepare_inputs.outputs.proceed == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DOC_REPORT_ARTIFACT: doc-sync-report-${{ github.run_id }}
+      DOC_PATCH_ARTIFACT: doc-sync-patch-${{ github.run_id }}
+      DOC_FILES_ARTIFACT: doc-sync-files-${{ github.run_id }}
+    outputs:
+      changed: ${{ steps.edit.outputs.changed }}
+      head_ref: ${{ needs.prepare_inputs.outputs.head_ref }}
+      base_ref: ${{ needs.prepare_inputs.outputs.base_ref }}
+      head_sha: ${{ needs.prepare_inputs.outputs.head_sha }}
+      pr_number: ${{ needs.prepare_inputs.outputs.pr_number }}
+      repository: ${{ needs.prepare_inputs.outputs.repository }}
+      doc_report_artifact: ${{ env.DOC_REPORT_ARTIFACT }}
+      doc_patch_artifact: ${{ env.DOC_PATCH_ARTIFACT }}
+      doc_files_artifact: ${{ env.DOC_FILES_ARTIFACT }}
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare_inputs.outputs.head_sha }}
+
+      - name: Checkout shared workflow assets
+        uses: actions/checkout@v5
+        with:
+          repository: activadee/codex-shared-workflows
+          ref: main
+          path: __codex_shared
+
+      - name: Restore doc-sync inputs
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.prepare_inputs.outputs.inputs_artifact }}
+          path: doc-sync-inputs
+
+      - name: Ignore helper artifacts
         run: |
           mkdir -p .git/info
-          cat <<EOF | while read -r path; do
+          cat <<'EOF' | while read -r path; do
           ${DOC_REPORT_PATH}
-          doc-commits.md
-          doc-globs.txt
-          codex_prompt.md
+          ${DOC_COMMITS_PATH}
+          ${DOC_GLOBS_FILE}
+          doc-sync-inputs/codex_prompt.md
           __codex_shared
           EOF
             if [ -n "$path" ] && ! grep -qx "$path" .git/info/exclude 2>/dev/null; then
@@ -115,95 +181,92 @@ jobs:
             fi
           done
 
-      - name: Fetch base and collect commit summary
-        if: steps.pr_context.outputs.proceed == 'true'
-        run: |
-          git fetch --no-tags origin ${{ steps.pr_context.outputs.base_ref }}
-          git log --no-merges --pretty=format:'- %s (%h)' origin/${{ steps.pr_context.outputs.base_ref }}..${{ steps.pr_context.outputs.head_sha }} > doc-commits.md
-          if [ ! -s doc-commits.md ]; then
-            echo "- No commits detected between origin/${{ steps.pr_context.outputs.base_ref }} and ${{ steps.pr_context.outputs.head_sha }}." > doc-commits.md
-          fi
-
-      - name: Checkout shared workflow assets
-        if: steps.pr_context.outputs.proceed == 'true'
-        uses: actions/checkout@v5
+      - name: Run Codex doc sync edits
+        id: edit
+        uses: ./.github/actions/doc-sync-edit
         with:
-          repository: activadee/codex-shared-workflows
-          ref: main
-          path: __codex_shared
-
-      - name: Write documentation scope manifest
-        if: steps.pr_context.outputs.proceed == 'true'
-        env:
-          DOC_GLOBS: ${{ inputs.doc_globs }}
-          DOC_GLOBS_PATH: doc-globs.txt
-        run: node __codex_shared/.github/scripts/doc-sync/write_doc_globs.js
-
-      - name: Prepare Codex prompt
-        if: steps.pr_context.outputs.proceed == 'true'
-        env:
-          BASE_REF: ${{ steps.pr_context.outputs.base_ref }}
-          HEAD_REF: ${{ steps.pr_context.outputs.head_ref }}
-          PR_NUMBER: ${{ steps.pr_context.outputs.number }}
-          REPOSITORY: ${{ steps.pr_context.outputs.repository }}
-          REPORT_PATH: ${{ env.DOC_REPORT_PATH }}
-          TEMPLATE_PATH: __codex_shared/.github/prompts/codex-doc-sync.md
-          DOC_GLOBS_PATH: doc-globs.txt
-          PROMPT_PATH: codex_prompt.md
-          COMMITS_PATH: doc-commits.md
-        run: node __codex_shared/.github/scripts/doc-sync/prepare_prompt.js
-
-      - name: Run Codex doc sync
-        if: steps.pr_context.outputs.proceed == 'true'
-        id: run_codex
-        uses: activadee/codex-action@main
-        env:
-          DOC_REPORT_PATH: ${{ env.DOC_REPORT_PATH }}
-          DOC_BASE_REF: ${{ steps.pr_context.outputs.base_ref }}
-          DOC_HEAD_REF: ${{ steps.pr_context.outputs.head_ref }}
-          DOC_HEAD_SHA: ${{ steps.pr_context.outputs.head_sha }}
-          DOC_PR_NUMBER: ${{ steps.pr_context.outputs.number }}
-          DOC_REPOSITORY: ${{ steps.pr_context.outputs.repository }}
-          DOC_GLOBS: ${{ inputs.doc_globs }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_REPO: ${{ steps.pr_context.outputs.repository }}
-        with:
-          sandbox: danger-full-access
-          codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
-          prompt-file: codex_prompt.md
-          safety-strategy: ${{ inputs.safety_strategy }}
+          codex_auth_json_b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
+          prompt_path: doc-sync-inputs/codex_prompt.md
+          doc_report_path: ${{ env.DOC_REPORT_PATH }}
+          doc_globs_file: doc-sync-inputs/${{ env.DOC_GLOBS_FILE }}
+          doc_patch_file: ${{ env.DOC_PATCH_FILE }}
+          doc_files_file: doc-changes.txt
+          base_ref: ${{ needs.prepare_inputs.outputs.base_ref }}
+          head_ref: ${{ needs.prepare_inputs.outputs.head_ref }}
+          head_sha: ${{ needs.prepare_inputs.outputs.head_sha }}
+          pr_number: ${{ needs.prepare_inputs.outputs.pr_number }}
+          repository: ${{ needs.prepare_inputs.outputs.repository }}
+          shared_path: __codex_shared
+          safety_strategy: ${{ inputs.safety_strategy }}
           model: ${{ inputs.model }}
           effort: ${{ inputs.effort }}
-          codex-args: ${{ inputs.codex_args }}
+          codex_args: ${{ inputs.codex_args }}
 
-      - name: Verify clean working tree
-        if: steps.pr_context.outputs.proceed == 'true'
-        run: |
-          if ! git diff --quiet --ignore-submodules --; then
-            git status -sb
-            echo "Working tree still has changes; expected Codex to commit and push via gh CLI." >&2
-            exit 1
-          fi
-          if [ ! -f "$DOC_REPORT_PATH" ]; then
-            echo "Documentation report $DOC_REPORT_PATH was not generated." >&2
-            exit 1
-          fi
+      - name: Upload documentation report
+        if: steps.edit.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DOC_REPORT_ARTIFACT }}
+          retention-days: 7
+          path: ${{ env.DOC_REPORT_PATH }}
 
-      - name: Confirm remote branch is up to date
-        if: steps.pr_context.outputs.proceed == 'true'
-        run: |
-          git fetch --no-tags origin ${{ steps.pr_context.outputs.head_ref }}
-          local_sha=$(git rev-parse HEAD)
-          remote_sha=$(git rev-parse origin/${{ steps.pr_context.outputs.head_ref }})
-          if [ "$local_sha" != "$remote_sha" ]; then
-            echo "Remote branch is not aligned with local HEAD; Codex was expected to push via gh CLI." >&2
-            exit 1
-          fi
+      - name: Upload doc diff
+        if: steps.edit.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DOC_PATCH_ARTIFACT }}
+          retention-days: 7
+          path: ${{ env.DOC_PATCH_FILE }}
 
-      - name: Show documentation report
-        if: steps.pr_context.outputs.proceed == 'true'
-        run: cat "$DOC_REPORT_PATH"
+      - name: Upload file list
+        if: steps.edit.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DOC_FILES_ARTIFACT }}
+          retention-days: 7
+          path: doc-changes.txt
 
-      - name: Skip doc sync
-        if: steps.pr_context.outputs.proceed != 'true'
-        run: echo "Doc sync skipped for this event."
+  push_docs:
+    needs: edit_docs
+    if: needs.edit_docs.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      HEAD_REF: ${{ needs.edit_docs.outputs.head_ref }}
+      PR_NUMBER: ${{ needs.edit_docs.outputs.pr_number }}
+    steps:
+      - name: Checkout target repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.edit_docs.outputs.head_ref }}
+
+      - name: Download doc diff
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.edit_docs.outputs.doc_patch_artifact }}
+          path: doc-sync-artifacts
+
+      - name: Download report
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.edit_docs.outputs.doc_report_artifact }}
+          path: doc-sync-artifacts
+
+      - name: Download file list
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.edit_docs.outputs.doc_files_artifact }}
+          path: doc-sync-artifacts
+
+      - name: Apply and push documentation updates
+        id: push_action
+        uses: ./.github/actions/doc-sync-push
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          doc_patch_file: doc-sync-artifacts/${{ env.DOC_PATCH_FILE }}
+          doc_report_path: doc-sync-artifacts/${{ env.DOC_REPORT_PATH }}
+          doc_files_path: doc-sync-artifacts/doc-changes.txt
+          head_ref: ${{ env.HEAD_REF }}
+          pr_number: ${{ needs.edit_docs.outputs.pr_number }}

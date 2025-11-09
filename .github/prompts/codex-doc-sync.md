@@ -19,14 +19,13 @@ You are operating inside a GitHub Actions runner with full access to the pull re
 3. Keep the working tree clean:
    - Use `git status --short` to verify only documentation files changed.
    - If non-doc files changed, revert them before continuing.
-4. Commit and push using the GitHub CLI:
-   - Export the token for the CLI (`export GH_TOKEN="$GITHUB_TOKEN"`) because GitHub CLI reads credentials from `GH_TOKEN` in Actions runners.
-   - Run `gh auth status` to verify authentication before pushing.
+4. Commit (but do **not** push) using the GitHub CLI:
+   - Export the token for the CLI (`export GH_TOKEN="$GITHUB_TOKEN"`) because GitHub CLI reads credentials from `GH_TOKEN` in Actions runners, then run `gh auth status` to verify access.
    - Configure git identity if needed: `git config user.name "github-actions[bot]"` and `git config user.email "github-actions[bot]@users.noreply.github.com"`.
    - Stage **only** documentation files (`git add <files>` or `git add -p`). Never stage or commit `doc-sync-report.md`; if it appears staged, run `git reset doc-sync-report.md` before continuing.
    - Review the staged diff to confirm that only documentation content changed.
    - Commit with the message `[skip ci][doc-sync] Auto-update docs for PR #{{PR_NUMBER}}`.
-   - Push via `gh` by running `gh api repos/{{REPOSITORY}}/git/refs/heads/{{HEAD_REF}} -X PATCH -f sha=$(git rev-parse HEAD)`.
+   - Do **not** run `git push`. Leave the workspace clean with the new commit present; the workflow will handle pushing in a later job.
    - If no documentation changes were needed, ensure the working tree remains clean and skip committing.
 5. Produce `{{REPORT_PATH}}` in Markdown with:
    - `## Outcome` — short sentence summarizing whether docs changed.
