@@ -64,7 +64,7 @@ jobs:
     steps:
       - name: Resolve pull request context
         id: context
-        uses: ./.github/actions/doc-sync-context
+        uses: activadee/codex-shared-workflows/.github/actions/doc-sync-context@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -80,17 +80,10 @@ jobs:
           fetch-depth: 0
           ref: ${{ steps.context.outputs.head_sha }}
 
-      - name: Checkout shared workflow assets
-        if: steps.context.outputs.proceed == 'true'
-        uses: actions/checkout@v5
-        with:
-          repository: activadee/codex-shared-workflows
-          ref: main
-          path: __codex_shared
 
       - name: Prepare workspace
         if: steps.context.outputs.proceed == 'true'
-        uses: ./.github/actions/doc-sync-prepare
+        uses: activadee/codex-shared-workflows/.github/actions/doc-sync-prepare@main
         with:
           base_ref: ${{ steps.context.outputs.base_ref }}
           head_sha: ${{ steps.context.outputs.head_sha }}
@@ -102,7 +95,7 @@ jobs:
 
       - name: Build Codex prompt
         if: steps.context.outputs.proceed == 'true'
-        uses: ./.github/actions/doc-sync-build-prompt
+        uses: activadee/codex-shared-workflows/.github/actions/doc-sync-build-prompt@main
         with:
           base_ref: ${{ steps.context.outputs.base_ref }}
           head_ref: ${{ steps.context.outputs.head_ref }}
@@ -183,7 +176,7 @@ jobs:
 
       - name: Run Codex doc sync edits
         id: edit
-        uses: ./.github/actions/doc-sync-edit
+        uses: activadee/codex-shared-workflows/.github/actions/doc-sync-edit@main
         with:
           codex_auth_json_b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
           prompt_path: doc-sync-inputs/codex_prompt.md
@@ -262,7 +255,7 @@ jobs:
 
       - name: Apply and push documentation updates
         id: push_action
-        uses: ./.github/actions/doc-sync-push
+        uses: activadee/codex-shared-workflows/.github/actions/doc-sync-push@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           doc_patch_file: doc-sync-artifacts/${{ env.DOC_PATCH_FILE }}
