@@ -167,6 +167,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ steps.pr_context.outputs.repository }}
         with:
+          sandbox: danger-full-access
           codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
           prompt-file: codex_prompt.md
           safety-strategy: ${{ inputs.safety_strategy }}
