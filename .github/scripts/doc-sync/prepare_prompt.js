@@ -33,6 +33,8 @@ function main() {
   const promptPath = path.resolve(env.PROMPT_PATH || 'codex_prompt.md');
   const docScopePath = env.DOC_GLOBS_PATH || 'doc-globs.txt';
   const baseRef = env.BASE_REF || 'unknown-base';
+  const headRef = env.HEAD_REF || 'unknown-head';
+  const repository = env.REPOSITORY || 'unknown/repo';
   const prNumber = env.PR_NUMBER || 'unknown-pr';
   const reportPath = env.REPORT_PATH || 'doc-sync-report.md';
   const commitsPath = env.COMMITS_PATH || '';
@@ -52,6 +54,8 @@ function main() {
     ['{{REPORT_PATH}}', reportPath],
     ['{{DOC_SCOPE}}', scopeSection],
     ['{{COMMIT_SUMMARY}}', commitSummary],
+    ['{{HEAD_REF}}', headRef],
+    ['{{REPOSITORY}}', repository],
   ]);
 
   let content = template;

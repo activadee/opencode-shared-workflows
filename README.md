@@ -17,7 +17,7 @@ Reusable GitHub Actions workflows for Codex-enabled repositories. These workflow
   Calls Codex to suggest up to three labels for new or updated issues, creating labels when needed.
 
 - `.github/workflows/codex-doc-sync.yml`  
-  Keeps Markdown and `docs/` content aligned with pull request changes. Codex reviews the diff, edits documentation when necessary, and pushes a `[skip ci][doc-sync]` commit plus an optional PR comment summarizing the updates.
+  Lets maintainers trigger a Codex-assisted documentation pass on demand. The LLM reads the full PR diff, edits scoped docs, and uses the GitHub CLI to push a `[skip ci][doc-sync]` commit directly to the PR branch.
 
 ## Using the workflows
 
@@ -145,7 +145,6 @@ Outputs:
 | Input | Default | Notes |
 | --- | --- | --- |
 | `doc_globs` | `docs/**`, `**/*.md`, `README*` | Newline-separated glob list that defines which files count as documentation. |
-| `comment_on_update` | `true` | Post a PR comment summarizing the automated doc edits when changes are pushed. |
 | `safety_strategy` | `drop-sudo` | Passed directly to `activadee/codex-action`. |
 | `model` / `effort` | _empty_ | Optional overrides for Codex model and reasoning effort. |
 | `codex_args` | _empty_ | Additional CLI arguments forwarded to `codex exec`. |

@@ -12,11 +12,6 @@ on:
           docs/**
           **/*.md
           README*
-      comment_on_update:
-        description: Post a pull request comment whenever docs were updated.
-        required: false
-        type: boolean
-        default: true
       safety_strategy:
         description: Safety strategy passed to Codex (drop-sudo/read-only/unprivileged-user/unsafe).
         required: false
@@ -79,14 +74,14 @@ jobs:
 
             if (!pr) {
               core.setOutput('proceed', 'false');
-              core.info('No pull request context detected in this event.');
+              core.info('No pull request context detected; skipping doc sync.');
               return;
             }
 
             const headRepoFull = pr.head.repo?.full_name || '';
             const sameRepo = headRepoFull === repoFull;
             if (!sameRepo) {
-              core.info(`Head repository ${headRepoFull || '(unknown)'} differs from ${repoFull}; skipping to avoid pushing to forks.`);
+              core.info(`Skipping doc sync because head repository ${headRepoFull || '(unknown)'} differs from ${repoFull}.`);
             }
 
             core.setOutput('proceed', sameRepo ? 'true' : 'false');
@@ -94,6 +89,7 @@ jobs:
             core.setOutput('base_ref', pr.base?.ref || '');
             core.setOutput('head_ref', pr.head?.ref || '');
             core.setOutput('head_sha', pr.head?.sha || '');
+            core.setOutput('repository', repoFull);
 
       - name: Checkout target repository
         if: steps.pr_context.outputs.proceed == 'true'
@@ -102,25 +98,29 @@ jobs:
           fetch-depth: 0
           ref: ${{ steps.pr_context.outputs.head_sha }}
 
-      - name: Fetch base reference
-        if: steps.pr_context.outputs.proceed == 'true'
-        run: git fetch --no-tags origin ${{ steps.pr_context.outputs.base_ref }}
-
-      - name: Collect commit summary
-        if: steps.pr_context.outputs.proceed == 'true'
-        run: |
-          git log --no-merges --pretty=format:'- %s (%h)' \
-            origin/${{ steps.pr_context.outputs.base_ref }}..${{ steps.pr_context.outputs.head_sha }} > doc-commits.md
-          if [ ! -s doc-commits.md ]; then
-            echo "- No commits detected between base and head." > doc-commits.md
-          fi
-
-      - name: Ignore doc summary file
+      - name: Ignore helper files
         if: steps.pr_context.outputs.proceed == 'true'
         run: |
           mkdir -p .git/info
-          if ! grep -qx "$DOC_REPORT_PATH" .git/info/exclude 2>/dev/null; then
-            echo "$DOC_REPORT_PATH" >> .git/info/exclude
+          cat <<EOF | while read -r path; do
+          ${DOC_REPORT_PATH}
+          doc-commits.md
+          doc-globs.txt
+          codex_prompt.md
+          __codex_shared
+          EOF
+            if [ -n "$path" ] && ! grep -qx "$path" .git/info/exclude 2>/dev/null; then
+              echo "$path" >> .git/info/exclude
+            fi
+          done
+
+      - name: Fetch base and collect commit summary
+        if: steps.pr_context.outputs.proceed == 'true'
+        run: |
+          git fetch --no-tags origin ${{ steps.pr_context.outputs.base_ref }}
+          git log --no-merges --pretty=format:'- %s (%h)' origin/${{ steps.pr_context.outputs.base_ref }}..${{ steps.pr_context.outputs.head_sha }} > doc-commits.md
+          if [ ! -s doc-commits.md ]; then
+            echo "- No commits detected between origin/${{ steps.pr_context.outputs.base_ref }} and ${{ steps.pr_context.outputs.head_sha }}." > doc-commits.md
           fi
 
       - name: Checkout shared workflow assets
@@ -142,7 +142,9 @@ jobs:
         if: steps.pr_context.outputs.proceed == 'true'
         env:
           BASE_REF: ${{ steps.pr_context.outputs.base_ref }}
+          HEAD_REF: ${{ steps.pr_context.outputs.head_ref }}
           PR_NUMBER: ${{ steps.pr_context.outputs.number }}
+          REPOSITORY: ${{ steps.pr_context.outputs.repository }}
           REPORT_PATH: ${{ env.DOC_REPORT_PATH }}
           TEMPLATE_PATH: __codex_shared/.github/prompts/codex-doc-sync.md
           DOC_GLOBS_PATH: doc-globs.txt
@@ -160,7 +162,10 @@ jobs:
           DOC_HEAD_REF: ${{ steps.pr_context.outputs.head_ref }}
           DOC_HEAD_SHA: ${{ steps.pr_context.outputs.head_sha }}
           DOC_PR_NUMBER: ${{ steps.pr_context.outputs.number }}
+          DOC_REPOSITORY: ${{ steps.pr_context.outputs.repository }}
           DOC_GLOBS: ${{ inputs.doc_globs }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ steps.pr_context.outputs.repository }}
         with:
           codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
           prompt-file: codex_prompt.md
@@ -169,83 +174,34 @@ jobs:
           effort: ${{ inputs.effort }}
           codex-args: ${{ inputs.codex_args }}
 
-      - name: Detect documentation changes
+      - name: Verify clean working tree
         if: steps.pr_context.outputs.proceed == 'true'
-        id: detect_docs
         run: |
-          node __codex_shared/.github/scripts/doc-sync/detect_doc_changes.js \
-            --globs-file doc-globs.txt \
-            --output doc-changes.txt
-          if [ -s doc-changes.txt ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
+          if ! git diff --quiet --ignore-submodules --; then
+            git status -sb
+            echo "Working tree still has changes; expected Codex to commit and push via gh CLI." >&2
+            exit 1
+          fi
+          if [ ! -f "$DOC_REPORT_PATH" ]; then
+            echo "Documentation report $DOC_REPORT_PATH was not generated." >&2
+            exit 1
           fi
 
-      - name: Docs already up to date
-        if: steps.pr_context.outputs.proceed == 'true' && steps.detect_docs.outputs.changed == 'false'
-        run: cat "$DOC_REPORT_PATH" 2>/dev/null || echo "Documentation already matched the code changes."
-
-      - name: Commit documentation updates
-        if: steps.pr_context.outputs.proceed == 'true' && steps.detect_docs.outputs.changed == 'true'
-        id: commit_docs
-        env:
-          PR_NUMBER: ${{ steps.pr_context.outputs.number }}
+      - name: Confirm remote branch is up to date
+        if: steps.pr_context.outputs.proceed == 'true'
         run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add --pathspec-from-file=doc-changes.txt
-          git commit -m "[skip ci][doc-sync] Auto-update docs for PR #${PR_NUMBER}"
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git fetch --no-tags origin ${{ steps.pr_context.outputs.head_ref }}
+          local_sha=$(git rev-parse HEAD)
+          remote_sha=$(git rev-parse origin/${{ steps.pr_context.outputs.head_ref }})
+          if [ "$local_sha" != "$remote_sha" ]; then
+            echo "Remote branch is not aligned with local HEAD; Codex was expected to push via gh CLI." >&2
+            exit 1
+          fi
 
-      - name: Push documentation updates
-        if: steps.pr_context.outputs.proceed == 'true' && steps.detect_docs.outputs.changed == 'true'
-        run: git push origin HEAD:${{ steps.pr_context.outputs.head_ref }}
+      - name: Show documentation report
+        if: steps.pr_context.outputs.proceed == 'true'
+        run: cat "$DOC_REPORT_PATH"
 
-      - name: Comment on pull request
-        if: steps.pr_context.outputs.proceed == 'true' && steps.detect_docs.outputs.changed == 'true' && inputs.comment_on_update
-        uses: actions/github-script@v7
-        env:
-          REPORT_PATH: ${{ env.DOC_REPORT_PATH }}
-          DOC_COMMIT_SHA: ${{ steps.commit_docs.outputs.sha }}
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const path = process.env.REPORT_PATH;
-            let summary = '';
-            try {
-              summary = fs.readFileSync(path, 'utf8').trim();
-            } catch (error) {
-              summary = 'Documentation was updated automatically to reflect the latest code changes.';
-            }
-            let files = '- (unknown)';
-            try {
-              const list = fs.readFileSync('doc-changes.txt', 'utf8')
-                .split('\n')
-                .map((line) => line.trim())
-                .filter(Boolean);
-              if (list.length) {
-                files = list.map((item) => `- ${item}`).join('\n');
-              }
-            } catch (error) {
-              // ignore, fallback remains
-            }
-            const commitSha = process.env.DOC_COMMIT_SHA || '';
-            const body = [
-              '🤖 Documentation synchronized automatically.',
-              '',
-              summary,
-              '',
-              'Updated files:',
-              files,
-              '',
-              commitSha ? `Commit: ${commitSha}` : '',
-            ].filter(Boolean).join('\n');
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body,
-            });
+      - name: Skip doc sync
+        if: steps.pr_context.outputs.proceed != 'true'
+        run: echo "Doc sync skipped for this event."

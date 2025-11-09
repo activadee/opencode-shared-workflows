@@ -1,31 +1,39 @@
 # Codex Docs Sync Task
 
-You are running inside a GitHub Actions job for a pull request. Your job is to keep documentation accurate.
+You are operating inside a GitHub Actions runner with full access to the pull request workspace. Use the provided GitHub CLI (`gh`) and git to keep documentation accurate and ensure changes are committed automatically.
 
 ## Context
-- Base branch to diff against: `{{BASE_REF}}`
+- Repository: `{{REPOSITORY}}`
+- Base branch for comparison: `{{BASE_REF}}`
+- Head branch for updates: `{{HEAD_REF}}`
 - Pull request number: `{{PR_NUMBER}}`
 - Documentation scope includes **only** files matching these globs:
 {{DOC_SCOPE}}
 - Commits included in this review:
 {{COMMIT_SUMMARY}}
-- Write your summary to `{{REPORT_PATH}}` (overwrite it every run).
+- Write your outcome summary to `{{REPORT_PATH}}` (overwrite the file every run).
 
-## Responsibilities
-1. Use `git fetch --all --quiet` if needed, then inspect the diff between `origin/{{BASE_REF}}` and the current HEAD (`git diff origin/{{BASE_REF}}...HEAD`). Focus on non-docs files to understand behavior changes.
-2. Decide whether any documentation (scoped above) must change. Consider docs under `docs/`, every Markdown file (`*.md`), and the root README.
-3. When updates are required:
-   - Edit only documentation files within the approved scope. Never modify source files or config.
-   - Prefer small, targeted changes that clearly explain the new behavior or API shifts introduced by the PR diff.
-   - Use `apply_patch` or write files directly. Run `git status --short` afterward to confirm that only approved doc files changed.
-4. When no updates are required, leave tracked files untouched but still explain why in the summary file.
-5. Always generate `{{REPORT_PATH}}` in Markdown with these sections:
-   - `## Outcome` — either `Docs already up to date.` or a short sentence summarizing what changed.
-   - `## Files` — bullet list of each doc you touched with a one-line reason or `- (none)`.
-   - `## Notes` — extra context for reviewers (tests run, assumptions, follow-ups). Use `- (none)` if empty.
-6. Do **not** create commits or push changes. Leave that to later workflow steps.
+## Required Workflow
+1. Fetch any missing refs (`git fetch --all --quiet`) and inspect `git diff origin/{{BASE_REF}}...HEAD` to understand behavior changes.
+2. Decide whether scoped docs need edits. Update only files covered by the provided globs (`docs/**`, Markdown files, README, etc.).
+3. Keep the working tree clean:
+   - Use `git status --short` to verify only documentation files changed.
+   - If non-doc files changed, revert them before continuing.
+4. Commit and push using the GitHub CLI:
+   - Run `gh auth status` to verify credentials (the `GH_TOKEN` env var is already configured for you).
+   - Configure git identity if needed: `git config user.name "github-actions[bot]"` and `git config user.email "github-actions[bot]@users.noreply.github.com"`.
+   - Stage the updated doc files only (`git add <files>` or `git add -p`).
+   - Review the staged diff to confirm that only documentation content changed.
+   - Commit with the message `[skip ci][doc-sync] Auto-update docs for PR #{{PR_NUMBER}}`.
+   - Push via `gh` by running `gh api repos/{{REPOSITORY}}/git/refs/heads/{{HEAD_REF}} -X PATCH -f sha=$(git rev-parse HEAD)`.
+   - If no documentation changes were needed, ensure the working tree remains clean and skip committing.
+5. Produce `{{REPORT_PATH}}` in Markdown with:
+   - `## Outcome` — short sentence summarizing whether docs changed.
+   - `## Files` — bullet list of touched docs with one-line reasons, or `- (none)`.
+   - `## Notes` — extra context, or `- (none)`.
+6. End with a clean working tree (no pending changes or untracked files outside `.gitignore`).
 
-## Definition of done
-- Working tree contains only allowed documentation edits (or no changes if docs were already current).
-- `{{REPORT_PATH}}` exists and reflects the final state.
-- Final response should mention whether docs changed and point readers to `{{REPORT_PATH}}`.
+## Definition of Done
+- Documentation is updated (or confirmed current) with commits already pushed to `{{HEAD_REF}}` using the GitHub CLI.
+- `{{REPORT_PATH}}` explains what happened.
+- The git working tree is clean so downstream workflow checks can rely on the state you left behind.
