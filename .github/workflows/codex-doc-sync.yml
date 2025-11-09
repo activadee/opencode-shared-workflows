@@ -47,28 +47,82 @@ permissions:
   pull-requests: write
 
 concurrency:
-  group: codex-doc-sync-${{ github.event.pull_request.number || github.run_id }}
+  group: codex-doc-sync-${{ github.event.pull_request.number || github.event.issue.number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   docs:
-    if: github.event.pull_request != null && github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request != null || github.event.issue.pull_request != null
     runs-on: ubuntu-latest
     env:
       DOC_REPORT_PATH: doc-sync-report.md
       DOC_SKIP_TAG: "[doc-sync]"
       SKIP_DOC_SYNC: 'false'
     steps:
+      - name: Resolve pull request context
+        id: pr_context
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const repoFull = `${owner}/${repo}`;
+
+            let pr = context.payload.pull_request;
+            if (!pr && context.payload.issue?.pull_request) {
+              const response = await github.rest.pulls.get({
+                owner,
+                repo,
+                pull_number: context.payload.issue.number,
+              });
+              pr = response.data;
+            }
+
+            if (!pr) {
+              core.setOutput('skip', 'true');
+              core.info('No pull request context detected in this event.');
+              return;
+            }
+
+            const headRepoFull = pr.head.repo?.full_name || '';
+            const sameRepo = headRepoFull === repoFull;
+            if (!sameRepo) {
+              core.info(`Head repository ${headRepoFull || '(unknown)'} differs from ${repoFull}; skipping to avoid pushing to forks.`);
+            }
+
+            core.setOutput('skip', sameRepo ? 'false' : 'true');
+            core.setOutput('number', String(pr.number));
+            core.setOutput('base_ref', pr.base?.ref || '');
+            core.setOutput('head_ref', pr.head?.ref || '');
+            core.setOutput('head_sha', pr.head?.sha || '');
+
+      - name: Export PR metadata
+        run: |
+          if [ "${{ steps.pr_context.outputs.skip }}" = "true" ]; then
+            echo "SKIP_DOC_SYNC=true" >> "$GITHUB_ENV"
+          else
+            {
+              echo "DOC_PR_NUMBER=${{ steps.pr_context.outputs.number }}"
+              echo "DOC_BASE_REF=${{ steps.pr_context.outputs.base_ref }}"
+              echo "DOC_HEAD_REF=${{ steps.pr_context.outputs.head_ref }}"
+              echo "DOC_HEAD_SHA=${{ steps.pr_context.outputs.head_sha }}"
+            } >> "$GITHUB_ENV"
+          fi
+
       - name: Checkout target repository
+        if: env.SKIP_DOC_SYNC != 'true'
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ env.DOC_HEAD_SHA }}
 
       - name: Fetch base reference
-        run: git fetch --no-tags origin ${{ github.event.pull_request.base.ref }}
+        if: env.SKIP_DOC_SYNC != 'true'
+        run: git fetch --no-tags origin ${{ env.DOC_BASE_REF }}
 
       - name: Ignore doc summary file
+        if: env.SKIP_DOC_SYNC != 'true'
         run: |
           mkdir -p .git/info
           if ! grep -qx "$DOC_REPORT_PATH" .git/info/exclude 2>/dev/null; then
@@ -77,6 +131,7 @@ jobs:
 
       - name: Check for doc-sync skip marker
         id: skip_marker
+        if: env.SKIP_DOC_SYNC != 'true'
         run: |
           set -euo pipefail
           last_message=$(git log -1 --pretty=%B || true)
@@ -106,8 +161,8 @@ jobs:
       - name: Prepare Codex prompt
         if: env.SKIP_DOC_SYNC != 'true'
         env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ env.DOC_BASE_REF }}
+          PR_NUMBER: ${{ env.DOC_PR_NUMBER }}
           REPORT_PATH: ${{ env.DOC_REPORT_PATH }}
           TEMPLATE_PATH: __codex_shared/.github/prompts/codex-doc-sync.md
           DOC_GLOBS_PATH: doc-globs.txt
@@ -121,10 +176,10 @@ jobs:
         env:
           DOC_REPORT_PATH: ${{ env.DOC_REPORT_PATH }}
           DOC_SKIP_TAG: ${{ env.DOC_SKIP_TAG }}
-          DOC_BASE_REF: ${{ github.event.pull_request.base.ref }}
-          DOC_HEAD_REF: ${{ github.event.pull_request.head.ref }}
-          DOC_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          DOC_PR_NUMBER: ${{ github.event.pull_request.number }}
+          DOC_BASE_REF: ${{ env.DOC_BASE_REF }}
+          DOC_HEAD_REF: ${{ env.DOC_HEAD_REF }}
+          DOC_HEAD_SHA: ${{ env.DOC_HEAD_SHA }}
+          DOC_PR_NUMBER: ${{ env.DOC_PR_NUMBER }}
           DOC_GLOBS: ${{ inputs.doc_globs }}
         with:
           codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
@@ -155,7 +210,7 @@ jobs:
         if: env.SKIP_DOC_SYNC != 'true' && steps.detect_docs.outputs.changed == 'true'
         id: commit_docs
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ env.DOC_PR_NUMBER }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -166,7 +221,7 @@ jobs:
 
       - name: Push documentation updates
         if: env.SKIP_DOC_SYNC != 'true' && steps.detect_docs.outputs.changed == 'true'
-        run: git push origin HEAD:${{ github.event.pull_request.head.ref }}
+        run: git push origin HEAD:${{ env.DOC_HEAD_REF }}
 
       - name: Comment on pull request
         if: env.SKIP_DOC_SYNC != 'true' && steps.detect_docs.outputs.changed == 'true' && inputs.comment_on_update
