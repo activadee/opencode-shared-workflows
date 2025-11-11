@@ -126,20 +126,6 @@ export const assertDocsOnlyChanged = async (patterns: string[]) => {
   }
 };
 
-export const renderPromptTemplate = (options: {
-  templatePath: string;
-  outputPath: string;
-  variables: Record<string, string>;
-}) => {
-  const template = fs.readFileSync(path.resolve(options.templatePath), 'utf8');
-  let rendered = template;
-  for (const [key, value] of Object.entries(options.variables)) {
-    const needle = new RegExp(escapeRegex(key), 'g');
-    rendered = rendered.replace(needle, value);
-  }
-  fs.writeFileSync(path.resolve(options.outputPath), rendered, 'utf8');
-};
-
 export const saveFileList = (files: string[], outputPath: string) => {
   const abs = path.resolve(outputPath);
   fs.mkdirSync(path.dirname(abs), { recursive: true });

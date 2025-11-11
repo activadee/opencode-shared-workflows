@@ -20,9 +20,6 @@ inputs:
   effort:
     description: "Codex reasoning effort override."
     required: false
-  codex_args:
-    description: "(Legacy) Ignored while using the Codex SDK; retained for backward compatibility."
-    required: false
   codex_bin:
     description: "Optional path to a Codex CLI binary; defaults to the SDK's bundled binary."
     required: false
@@ -82,6 +79,21 @@ inputs:
     default: "false"
   notes_extra:
     description: "Extra markdown appended to the release note context."
+    required: false
+  project_name:
+    description: "Project name referenced inside the release prompt template."
+    required: false
+  project_language:
+    description: "Primary language referenced inside the release prompt template."
+    required: false
+  package_name:
+    description: "Package/module identifier referenced inside the release prompt template."
+    required: false
+  project_purpose:
+    description: "Single-sentence description used in the release prompt template."
+    required: false
+  repository_url:
+    description: "Repository URL or slug referenced inside the release prompt template."
     required: false
   commit_limit:
     description: "Number of commits to feed into Codex when generating release notes (default 50)."

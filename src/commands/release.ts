@@ -1,10 +1,13 @@
 import { Command } from 'commander';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { CodexClient } from '../lib/codex';
 import { loadActionContext } from '../lib/context';
 import { createOrUpdateRelease, listRecentCommits } from '../lib/github';
 import { runGoTests } from '../lib/go';
 import { logger } from '../lib/logger';
+import { renderTemplateFile } from '../lib/templates';
 
 interface ReleaseOptions {
   tagName: string;
@@ -26,6 +29,11 @@ interface ReleaseOptions {
   dryRun?: boolean;
   enableNetwork?: boolean;
   enableWebSearch?: boolean;
+  projectName?: string;
+  projectLanguage?: string;
+  packageName?: string;
+  projectPurpose?: string;
+  repositoryUrl?: string;
 }
 
 const RELEASE_SCHEMA = '.github/prompts/codex-release-schema.json';
@@ -55,11 +63,15 @@ export const registerReleaseCommand = (program: Command) => {
     .option('--prompt <path>', 'Prompt file path for release notes', '.github/prompts/codex-release-template.md')
     .option('--model <name>', 'Codex model override')
     .option('--effort <level>', 'Codex reasoning effort override')
-    .option('--codex-args <args>', 'Legacy Codex CLI flags (ignored when using the SDK)')
     .option('--codex-bin <path>', 'Override Codex binary path for the SDK', 'codex')
     .option('--enable-network', 'Allow Codex outbound network access', false)
     .option('--enable-web-search', 'Allow Codex to run web searches', false)
     .option('--notes-extra <markdown>', 'Extra markdown context appended to Codex input')
+    .option('--project-name <text>', 'Project name referenced in the prompt', 'Codex Go SDK')
+    .option('--project-language <text>', 'Primary language referenced in the prompt', 'Go')
+    .option('--package-name <text>', 'Package/module identifier referenced in the prompt', 'github.com/activadee/godex')
+    .option('--project-purpose <text>', 'One-line description of the project purpose', 'Provides a wrapper around the Codex CLI.')
+    .option('--repository-url <text>', 'Repository URL or identifier referenced in the prompt', 'https://github.com/activadee/godex')
     .option('--commit-limit <number>', 'Number of commits to include', (value) => Number.parseInt(value, 10), 50)
     .option('--dry-run', 'Print notes without publishing release', false)
     .action(async (opts: ReleaseOptions) => {
@@ -82,15 +94,22 @@ export const registerReleaseCommand = (program: Command) => {
         logger.warn('codexArgs are not supported when using the Codex SDK and will be ignored.');
       }
       const codex = new CodexClient(opts.codexBin);
-      const notes = await codex.run({
-        promptPath: path.resolve(opts.prompt),
-        input,
-        model: opts.model,
-        effort: opts.effort,
-        outputSchemaPath: path.resolve(RELEASE_SCHEMA),
-        networkAccessEnabled: Boolean(opts.enableNetwork),
-        webSearchEnabled: Boolean(opts.enableWebSearch)
-      });
+      const templatePath = path.resolve(opts.prompt);
+      const { promptPath, cleanup } = renderReleasePrompt(templatePath, buildReleasePromptVariables(opts));
+      let notes: string;
+      try {
+        notes = await codex.run({
+          promptPath,
+          input,
+          model: opts.model,
+          effort: opts.effort,
+          outputSchemaPath: path.resolve(RELEASE_SCHEMA),
+          networkAccessEnabled: Boolean(opts.enableNetwork),
+          webSearchEnabled: Boolean(opts.enableWebSearch)
+        });
+      } finally {
+        cleanup();
+      }
       const releaseBody = formatReleaseBody(notes);
 
       if (opts.dryRun) {
@@ -126,4 +145,26 @@ const formatReleaseBody = (raw: string) => {
     });
     return raw;
   }
+};
+
+const buildReleasePromptVariables = (opts: ReleaseOptions): Record<string, string> => ({
+  '{{PROJECT_NAME}}': opts.projectName ?? 'Codex Go SDK',
+  '{{PROJECT_LANGUAGE}}': opts.projectLanguage ?? 'Go',
+  '{{PACKAGE_NAME}}': opts.packageName ?? 'github.com/activadee/godex',
+  '{{PROJECT_PURPOSE}}': opts.projectPurpose ?? 'Provides a wrapper around the Codex CLI.',
+  '{{REPOSITORY_URL}}': opts.repositoryUrl ?? 'https://github.com/activadee/godex'
+});
+
+const renderReleasePrompt = (templatePath: string, variables: Record<string, string>) => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'codex-release-'));
+  const promptPath = path.join(tempDir, 'prompt.md');
+  renderTemplateFile({ templatePath, outputPath: promptPath, variables });
+  const cleanup = () => {
+    try {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    } catch {
+      // ignore cleanup errors
+    }
+  };
+  return { promptPath, cleanup };
 };

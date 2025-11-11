@@ -32,7 +32,6 @@ const buildReviewArgs = () => {
   pushOption(args, '--prompt-extra', core.getInput('prompt_extra'));
   pushOption(args, '--model', core.getInput('model'));
   pushOption(args, '--effort', core.getInput('effort'));
-  pushOption(args, '--codex-args', core.getInput('codex_args'));
   pushOption(args, '--codex-bin', core.getInput('codex_bin'));
   pushOption(args, '--event-path', core.getInput('event_path'));
   const pullNumber = core.getInput('pull_number');
@@ -76,9 +75,13 @@ const buildReleaseArgs = () => {
   pushOption(args, '--prompt', core.getInput('prompt_path') || '.github/prompts/codex-release-template.md');
   pushOption(args, '--model', core.getInput('model'));
   pushOption(args, '--effort', core.getInput('effort'));
-  pushOption(args, '--codex-args', core.getInput('codex_args'));
   pushOption(args, '--codex-bin', core.getInput('codex_bin'));
   pushOption(args, '--notes-extra', core.getInput('notes_extra'));
+  pushOption(args, '--project-name', core.getInput('project_name'));
+  pushOption(args, '--project-language', core.getInput('project_language'));
+  pushOption(args, '--package-name', core.getInput('package_name'));
+  pushOption(args, '--project-purpose', core.getInput('project_purpose'));
+  pushOption(args, '--repository-url', core.getInput('repository_url'));
   const commitLimit = core.getInput('commit_limit');
   if (commitLimit) {
     args.push('--commit-limit', commitLimit);
@@ -99,7 +102,6 @@ const buildAutoLabelArgs = () => {
   }
   pushOption(args, '--model', core.getInput('model'));
   pushOption(args, '--effort', core.getInput('effort'));
-  pushOption(args, '--codex-args', core.getInput('codex_args'));
   pushOption(args, '--codex-bin', core.getInput('codex_bin'));
   pushOption(args, '--event-path', core.getInput('event_path'));
   if (truthy(core.getInput('dry_run'))) {
@@ -129,7 +131,6 @@ const buildDocSyncArgs = () => {
   pushOption(args, '--codex-bin', core.getInput('codex_bin'));
   pushOption(args, '--model', core.getInput('model'));
   pushOption(args, '--effort', core.getInput('effort'));
-  pushOption(args, '--codex-args', core.getInput('codex_args'));
   pushOption(args, '--safety-strategy', core.getInput('safety_strategy'));
   if (truthy(core.getInput('dry_run'))) {
     args.push('--dry-run');

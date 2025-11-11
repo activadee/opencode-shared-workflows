@@ -12,10 +12,10 @@ import {
   computeDocPatch,
   hasPendingChanges,
   parseDocPatterns,
-  renderPromptTemplate,
   saveFileList,
   writeDocGlobsFile
 } from '../lib/doc-sync';
+import { renderTemplateFile } from '../lib/templates';
 import { commitAll, ensureGitUser, getHeadSha, pushChanges } from '../lib/git';
 import { logger } from '../lib/logger';
 
@@ -111,7 +111,6 @@ export const registerDocSyncCommand = (program: Command) => {
     .option('--model <name>', 'Codex model override')
     .option('--effort <level>', 'Codex effort override')
     .option('--safety-strategy <mode>', 'Legacy safety strategy flag (ignored when using the SDK)')
-    .option('--codex-args <args>', 'Legacy Codex CLI flags (ignored when using the SDK)')
     .option('--dry-run', 'Skip committing/pushing, only show summary', false)
     .option('--no-auto-commit', 'Do not create a git commit')
     .option('--no-auto-push', 'Do not push changes upstream')
@@ -157,7 +156,7 @@ export const registerDocSyncCommand = (program: Command) => {
 
       const docScope = docPatterns.map((pattern) => `- ${pattern}`).join('\n');
       const commitSummary = readFileOrDefault(opts.commitsPath, '- No commits provided.');
-      renderPromptTemplate({
+      renderTemplateFile({
         templatePath: opts.promptTemplate,
         outputPath: opts.promptPath,
         variables: {

@@ -93,7 +93,6 @@ export const registerReviewCommand = (program: Command) => {
     .option('--prompt-extra <markdown>', 'Additional markdown appended to the prompt')
     .option('--model <name>', 'Codex model override')
     .option('--effort <level>', 'Codex reasoning effort override')
-    .option('--codex-args <args>', 'Legacy Codex CLI args (ignored when using the SDK)')
     .option('--codex-bin <path>', 'Override Codex binary path for the SDK', 'codex')
     .option('--enable-network', 'Allow Codex outbound network access', false)
     .option('--enable-web-search', 'Allow Codex to run web searches', false)

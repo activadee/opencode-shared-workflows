@@ -62,7 +62,6 @@ export const registerAutoLabelCommand = (program: Command) => {
     .option('--max-labels <number>', 'Maximum labels to apply', (value) => Number.parseInt(value, 10), 3)
     .option('--model <name>', 'Codex model override')
     .option('--effort <level>', 'Codex effort override')
-    .option('--codex-args <args>', 'Legacy Codex CLI flags (ignored when using the SDK)')
     .option('--codex-bin <path>', 'Override Codex binary path for the SDK', 'codex')
     .option('--enable-network', 'Allow Codex outbound network access', false)
     .option('--enable-web-search', 'Allow Codex to run web searches', false)

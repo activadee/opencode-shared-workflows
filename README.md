@@ -71,7 +71,7 @@ Multiple workflows can be triggered from the same action by adjusting `command`:
           CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
 ```
 
-Available `with:` inputs mirror the CLI flags (see Command Reference). Every command accepts `model`, `effort`, `codex_bin`, `dry_run`, `prompt_path`, plus the booleans `network_access`/`web_search` (both default to `false`). `codex_args` remains for backward compatibility but is ignored while using the Codex SDK.
+Available `with:` inputs mirror the CLI flags (see Command Reference). Every command accepts `model`, `effort`, `codex_bin`, `dry_run`, `prompt_path`, plus the booleans `network_access`/`web_search` (both default to `false`).
 
 ## CLI Usage
 
@@ -93,7 +93,7 @@ CLI execution shares the same environment conventions as the Action: export `COD
 | --- | --- | --- |
 | `review` | Generates a Codex PR review and submits it via `pulls.createReview`. | `--prompt`, `--prompt-extra`, `--model`, `--effort`, `--codex-args`, `--pull-number`, `--dry-run` |
 | `go-tests` | Installs (if requested) and runs `go test`. | `--go-version`, `--go-version-file`, `--working-directory`, `--test-flags`, `--pre-test`, `--env KEY=VALUE` |
-| `release` | Optionally runs Go tests, asks Codex for release notes, and creates/updates a GitHub release. | `--tag-name` (required), `--release-title`, `--target`, `--skip-tests`, `--notes-extra`, `--commit-limit`, Codex flags |
+| `release` | Optionally runs Go tests, asks Codex for release notes, and creates/updates a GitHub release. | `--tag-name` (required), `--release-title`, `--target`, `--skip-tests`, `--notes-extra`, `--project-name`, `--project-language`, `--package-name`, `--project-purpose`, `--repository-url`, `--commit-limit`, Codex flags |
 | `auto-label` | Calls Codex to propose labels for an issue/PR and applies them. | `--prompt`, `--max-labels`, `--dry-run` |
 | `doc-sync` | Replaces the multi-job doc-sync workflow: prepares prompts, invokes Codex edits, verifies doc-only changes, commits, pushes, and comments. | `--doc-globs`, `--prompt-template`, `--safety-strategy`, `--no-auto-commit`, `--no-auto-push`, `--no-comment`, Codex flags |
 
@@ -110,6 +110,7 @@ CLI execution shares the same environment conventions as the Action: export `COD
 ### `release`
 - Reuses `go-tests` plumbing (unless `--skip-tests`).
 - Fetches recent commits (`commit_limit`, default 50) and feeds the summary plus `notes_extra` into `.github/prompts/codex-release-template.md`.
+- Customize the release context without editing the prompt by supplying `--project-name`, `--project-language`, `--package-name`, `--project-purpose`, or `--repository-url` (these values populate the template placeholders before Codex runs).
 - Calls GitHub Releases API to create/update the tag and logs the release URL (also printed in action logs).
 
 ### `auto-label`
