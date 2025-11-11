@@ -19,7 +19,11 @@ interface AutoLabelOptions {
   codexBin?: string;
   dryRun?: boolean;
   eventPath?: string;
+  enableNetwork?: boolean;
+  enableWebSearch?: boolean;
 }
+
+const AUTO_LABEL_SCHEMA = '.github/prompts/codex-auto-label-schema.json';
 
 const buildInput = (payload: IssueEventPayload) => {
   const title = payload.issue?.title ?? 'Untitled';
@@ -60,6 +64,8 @@ export const registerAutoLabelCommand = (program: Command) => {
     .option('--effort <level>', 'Codex effort override')
     .option('--codex-args <args>', 'Legacy Codex CLI flags (ignored when using the SDK)')
     .option('--codex-bin <path>', 'Override Codex binary path for the SDK', 'codex')
+    .option('--enable-network', 'Allow Codex outbound network access', false)
+    .option('--enable-web-search', 'Allow Codex to run web searches', false)
     .option('--dry-run', 'Print suggested labels without applying', false)
     .option('--event-path <path>', 'Event payload override')
     .action(async (opts: AutoLabelOptions) => {
@@ -74,7 +80,10 @@ export const registerAutoLabelCommand = (program: Command) => {
         promptPath: path.resolve(opts.prompt),
         input,
         model: opts.model,
-        effort: opts.effort
+        effort: opts.effort,
+        outputSchemaPath: path.resolve(AUTO_LABEL_SCHEMA),
+        networkAccessEnabled: Boolean(opts.enableNetwork),
+        webSearchEnabled: Boolean(opts.enableWebSearch)
       });
       const labels = parseLabels(raw, opts.maxLabels);
 

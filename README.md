@@ -71,7 +71,7 @@ Multiple workflows can be triggered from the same action by adjusting `command`:
           CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
 ```
 
-Available `with:` inputs mirror the CLI flags (see Command Reference). Every command accepts `model`, `effort`, `codex_bin`, `dry_run`, and `prompt_path` overrides. `codex_args` remains for backward compatibility but is ignored while using the Codex SDK.
+Available `with:` inputs mirror the CLI flags (see Command Reference). Every command accepts `model`, `effort`, `codex_bin`, `dry_run`, `prompt_path`, plus the booleans `network_access`/`web_search` (both default to `false`). `codex_args` remains for backward compatibility but is ignored while using the Codex SDK.
 
 ## CLI Usage
 

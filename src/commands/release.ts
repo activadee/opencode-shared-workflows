@@ -24,7 +24,11 @@ interface ReleaseOptions {
   notesExtra?: string;
   commitLimit?: number;
   dryRun?: boolean;
+  enableNetwork?: boolean;
+  enableWebSearch?: boolean;
 }
+
+const RELEASE_SCHEMA = '.github/prompts/codex-release-schema.json';
 
 const buildNotesInput = (commits: unknown[], extra?: string) => {
   const commitLines = commits
@@ -53,6 +57,8 @@ export const registerReleaseCommand = (program: Command) => {
     .option('--effort <level>', 'Codex reasoning effort override')
     .option('--codex-args <args>', 'Legacy Codex CLI flags (ignored when using the SDK)')
     .option('--codex-bin <path>', 'Override Codex binary path for the SDK', 'codex')
+    .option('--enable-network', 'Allow Codex outbound network access', false)
+    .option('--enable-web-search', 'Allow Codex to run web searches', false)
     .option('--notes-extra <markdown>', 'Extra markdown context appended to Codex input')
     .option('--commit-limit <number>', 'Number of commits to include', (value) => Number.parseInt(value, 10), 50)
     .option('--dry-run', 'Print notes without publishing release', false)
@@ -80,12 +86,16 @@ export const registerReleaseCommand = (program: Command) => {
         promptPath: path.resolve(opts.prompt),
         input,
         model: opts.model,
-        effort: opts.effort
+        effort: opts.effort,
+        outputSchemaPath: path.resolve(RELEASE_SCHEMA),
+        networkAccessEnabled: Boolean(opts.enableNetwork),
+        webSearchEnabled: Boolean(opts.enableWebSearch)
       });
+      const releaseBody = formatReleaseBody(notes);
 
       if (opts.dryRun) {
         logger.info('Generated release notes (dry-run):');
-        logger.info(notes);
+        logger.info(releaseBody);
         return;
       }
 
@@ -93,10 +103,27 @@ export const registerReleaseCommand = (program: Command) => {
         tag: opts.tagName,
         target: opts.target,
         releaseName: opts.releaseTitle,
-        body: notes,
+        body: releaseBody,
         draft: opts.draft
       });
 
       logger.info(`Release ready at ${url}`);
     });
+};
+
+const formatReleaseBody = (raw: string) => {
+  try {
+    const parsed = JSON.parse(raw) as { overview?: string; highlights?: string[] };
+    const overview = parsed.overview?.trim() ?? 'No overview provided.';
+    const highlights = Array.isArray(parsed.highlights) && parsed.highlights.length
+      ? parsed.highlights.map((item) => `- ${item}`).join('\n')
+      : '- Update details unavailable.';
+
+    return [`${overview}`, '', '## Highlights', highlights].join('\n');
+  } catch (error) {
+    logger.warn('Failed to parse structured release notes; using raw output.', {
+      message: (error as Error).message
+    });
+    return raw;
+  }
 };

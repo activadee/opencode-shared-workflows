@@ -26,6 +26,14 @@ inputs:
   codex_bin:
     description: "Optional path to a Codex CLI binary; defaults to the SDK's bundled binary."
     required: false
+  network_access:
+    description: "Enable Codex outbound network calls (default: false)."
+    required: false
+    default: "false"
+  web_search:
+    description: "Allow Codex to perform web searches (default: false)."
+    required: false
+    default: "false"
   event_path:
     description: "Path to a GitHub event payload JSON file (auto-label/review/doc-sync fallback)."
     required: false

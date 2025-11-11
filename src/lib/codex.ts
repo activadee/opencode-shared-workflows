@@ -17,6 +17,9 @@ export interface CodexRunOptions {
   workingDirectory?: string;
   skipGitRepoCheck?: boolean;
   extraEnv?: Record<string, string>;
+  outputSchemaPath?: string;
+  networkAccessEnabled?: boolean;
+  webSearchEnabled?: boolean;
 }
 
 const decodeCodexAuth = (): string | undefined => {
@@ -69,6 +72,22 @@ const composePrompt = (promptPath: string, input?: string) => {
   return `${prompt}\n\n---\n\n${input}`;
 };
 
+const loadSchema = (schemaPath?: string): unknown => {
+  if (!schemaPath) {
+    return undefined;
+  }
+  const resolved = path.resolve(schemaPath);
+  if (!fs.existsSync(resolved)) {
+    throw new Error(`Codex output schema not found at ${resolved}`);
+  }
+
+  try {
+    return JSON.parse(fs.readFileSync(resolved, 'utf8'));
+  } catch (error) {
+    throw new Error(`Failed to parse Codex schema at ${resolved}: ${(error as Error).message}`);
+  }
+};
+
 const normalizeEffort = (value?: string): ModelReasoningEffort | undefined => {
   if (!value) {
     return undefined;
@@ -95,6 +114,7 @@ export class CodexClient {
 
   async run(options: CodexRunOptions) {
     const payload = composePrompt(path.resolve(options.promptPath), options.input);
+    const outputSchema = loadSchema(options.outputSchemaPath);
 
     return this.withEnv(options.extraEnv, async () => {
       const thread = this.codex.startThread({
@@ -102,10 +122,12 @@ export class CodexClient {
         modelReasoningEffort: normalizeEffort(options.effort),
         sandboxMode: options.sandboxMode,
         workingDirectory: options.workingDirectory,
-        skipGitRepoCheck: options.skipGitRepoCheck
+        skipGitRepoCheck: options.skipGitRepoCheck,
+        networkAccessEnabled: options.networkAccessEnabled ?? false,
+        webSearchEnabled: options.webSearchEnabled ?? false
       });
 
-      const turn = await thread.run(payload);
+      const turn = await thread.run(payload, { outputSchema });
       return turn.finalResponse.trim();
     });
   }

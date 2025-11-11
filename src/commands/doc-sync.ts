@@ -43,6 +43,8 @@ interface DocSyncOptions {
   autoPush?: boolean;
   comment?: boolean;
   eventPath?: string;
+  enableNetwork?: boolean;
+  enableWebSearch?: boolean;
 }
 
 const readFileOrDefault = (filePath: string, fallback: string) => {
@@ -115,6 +117,8 @@ export const registerDocSyncCommand = (program: Command) => {
     .option('--no-auto-push', 'Do not push changes upstream')
     .option('--no-comment', 'Skip PR comment')
     .option('--event-path <path>', 'Event payload override path')
+    .option('--enable-network', 'Allow Codex outbound network access', false)
+    .option('--enable-web-search', 'Allow Codex to run web searches', false)
     .action(async (opts: DocSyncOptions) => {
       const ctx = loadActionContext({ eventPath: opts.eventPath });
       const payload = readEventPayload<PullRequestEventPayload>(ctx.eventPath) ?? {};
@@ -190,7 +194,9 @@ export const registerDocSyncCommand = (program: Command) => {
         promptPath: path.resolve(opts.promptPath),
         model: opts.model,
         effort: opts.effort,
-        extraEnv
+        extraEnv,
+        networkAccessEnabled: Boolean(opts.enableNetwork),
+        webSearchEnabled: Boolean(opts.enableWebSearch)
       });
 
       await assertDocsOnlyChanged(docPatterns);

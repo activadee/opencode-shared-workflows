@@ -11,6 +11,8 @@ import {
 } from '../lib/github';
 import { logger } from '../lib/logger';
 
+const REVIEW_SCHEMA = '.github/prompts/codex-review-schema.json';
+
 interface ReviewOptions {
   prompt: string;
   promptExtra?: string;
@@ -21,6 +23,8 @@ interface ReviewOptions {
   dryRun?: boolean;
   eventPath?: string;
   pullNumber?: number;
+  enableNetwork?: boolean;
+  enableWebSearch?: boolean;
 }
 
 const buildCodexInput = async (
@@ -58,6 +62,29 @@ const buildCodexInput = async (
   return `${metadata}${guidance}\n\n---\n\n${fileSummaries}`;
 };
 
+const formatReviewResponse = (raw: string) => {
+  try {
+    const parsed = JSON.parse(raw) as {
+      summary?: string;
+      comments?: Array<{ path: string; line: number; body: string }>;
+    };
+    const summary = parsed.summary?.trim() || 'No issues detected.';
+    const comments = Array.isArray(parsed.comments) ? parsed.comments : [];
+    const findings = comments.length
+      ? comments
+          .map((comment) => `- \`${comment.path}:${comment.line}\`\n  ${comment.body}`)
+          .join('\n')
+      : '- ✅ No blocking findings.';
+
+    return [`## Summary`, summary, '', '## Findings', findings].join('\n');
+  } catch (error) {
+    logger.warn('Failed to parse structured review output; returning raw text.', {
+      message: (error as Error).message
+    });
+    return raw;
+  }
+};
+
 export const registerReviewCommand = (program: Command) => {
   program
     .command('review')
@@ -68,6 +95,8 @@ export const registerReviewCommand = (program: Command) => {
     .option('--effort <level>', 'Codex reasoning effort override')
     .option('--codex-args <args>', 'Legacy Codex CLI args (ignored when using the SDK)')
     .option('--codex-bin <path>', 'Override Codex binary path for the SDK', 'codex')
+    .option('--enable-network', 'Allow Codex outbound network access', false)
+    .option('--enable-web-search', 'Allow Codex to run web searches', false)
     .option('--dry-run', 'Only print the Codex output without submitting a review', false)
     .option('--event-path <path>', 'Path to a GitHub event payload override')
     .option('--pull-number <number>', 'Explicit pull request number override', (value) =>
@@ -86,8 +115,12 @@ export const registerReviewCommand = (program: Command) => {
         promptPath: path.resolve(opts.prompt),
         input,
         model: opts.model,
-        effort: opts.effort
+        effort: opts.effort,
+        outputSchemaPath: path.resolve(REVIEW_SCHEMA),
+        networkAccessEnabled: Boolean(opts.enableNetwork),
+        webSearchEnabled: Boolean(opts.enableWebSearch)
       });
+      const body = formatReviewResponse(output);
 
       if (opts.dryRun) {
         logger.info('Codex output (dry-run):');
@@ -96,7 +129,7 @@ export const registerReviewCommand = (program: Command) => {
       }
 
       const pullNumber = opts.pullNumber ?? requirePullRequestNumber(event);
-      await createReview(ctx, pullNumber, output);
+      await createReview(ctx, pullNumber, body);
       logger.info(`Submitted review for PR #${pullNumber}`);
     });
 };

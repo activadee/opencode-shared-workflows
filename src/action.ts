@@ -21,6 +21,11 @@ const pushBooleanFlag = (args: string[], flag: string, enabled?: boolean) => {
   }
 };
 
+const pushSharedCodexFlags = (args: string[]) => {
+  pushBooleanFlag(args, '--enable-network', truthy(core.getInput('network_access')));
+  pushBooleanFlag(args, '--enable-web-search', truthy(core.getInput('web_search')));
+};
+
 const buildReviewArgs = () => {
   const args: string[] = [];
   pushOption(args, '--prompt', core.getInput('prompt_path') || '.github/prompts/codex-review.md');
@@ -37,6 +42,7 @@ const buildReviewArgs = () => {
   if (truthy(core.getInput('dry_run'))) {
     args.push('--dry-run');
   }
+  pushSharedCodexFlags(args);
   return args;
 };
 
@@ -80,6 +86,7 @@ const buildReleaseArgs = () => {
   if (truthy(core.getInput('dry_run'))) {
     args.push('--dry-run');
   }
+  pushSharedCodexFlags(args);
   return args;
 };
 
@@ -98,6 +105,7 @@ const buildAutoLabelArgs = () => {
   if (truthy(core.getInput('dry_run'))) {
     args.push('--dry-run');
   }
+  pushSharedCodexFlags(args);
   return args;
 };
 
@@ -135,6 +143,7 @@ const buildDocSyncArgs = () => {
   if (!truthy(core.getInput('comment'), true)) {
     args.push('--no-comment');
   }
+  pushSharedCodexFlags(args);
   return args;
 };
 
