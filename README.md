@@ -1,179 +1,157 @@
-# Codex Shared Workflows
+# Codex Unified Workflows
 
-Reusable GitHub Actions workflows for Codex-enabled repositories. These workflows live in their own repository so multiple projects can invoke them via `workflow_call` while centralizing prompts, scripts, and configuration.
+This repository now ships a single TypeScript-powered CLI plus a matching GitHub Action that replaces the legacy reusable workflows (`codex-review.yml`, `go-tests.yml`, `release.yml`, `auto-label.yml`, and `codex-doc-sync.yml`). Each workflow is implemented as a dedicated CLI command, and the Action exposes them via a single `command` input so downstream repositories only have to pin one artifact.
 
-## Workflows
+## Requirements
 
-- `.github/workflows/codex-review.yml`  
-  Runs a Codex-powered pull request review. It collects PR context, executes `activadee/codex-action`, normalizes the output, and posts inline review comments plus a summary.
+- **Node.js 20+** (the GitHub Action runs on the Node 20 runtime, and the CLI enforces `engines.node >= 20`).
+- **Codex credentials**: provide `CODEX_AUTH_JSON_B64` (Base64-encoded `auth.json`) as a secret anywhere Codex is invoked.
+- **`GITHUB_TOKEN`/`GH_TOKEN`** with repo + PR scope for operations that interact with GitHub APIs (reviews, releases, doc-sync comments/pushes).
 
-- `.github/workflows/go-tests.yml`  
-  Installs Go, caches dependencies, and executes `go test` with configurable flags.
-
-- `.github/workflows/release.yml`  
-  Generates release notes with Codex and publishes a GitHub release, optionally running `go test` first.
-
-- `.github/workflows/auto-label.yml`  
-  Calls Codex to suggest up to three labels for new or updated issues, creating labels when needed.
-
-- `.github/workflows/codex-doc-sync.yml`  
-  Runs Codex in a dedicated job to edit and commit documentation changes, then hands off to a follow-up job that applies the generated bundle and pushes it to the PR branch while posting the doc summary.
-
-## Using the workflows
-
-Create a workflow in another repository and reference the desired file via `uses`. Pin to a tag or commit once published.
+## GitHub Action Usage
 
 ```yaml
-# .github/workflows/pr-review.yml
-name: PR Review
+name: codex-review
 
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
 
 jobs:
-  codex-review:
-    uses: activadee/codex-shared-workflows/.github/workflows/codex-review.yml@v1
-    secrets: inherit
-    with:
-      prompt_extra: |
-        Prioritize security regressions and user-facing bugs.
-
-  auto-label:
-    uses: activadee/codex-shared-workflows/.github/workflows/auto-label.yml@v1
-    secrets: inherit
-    with:
-      max_labels: 3
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Codex review
+        uses: activadee/codex-shared-workflows@v2
+        with:
+          command: review
+          prompt_extra: |
+            Prioritize security regressions and visible UX issues.
+        env:
+          CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
 ```
+
+Multiple workflows can be triggered from the same action by adjusting `command`:
 
 ```yaml
-# .github/workflows/ci.yml
-name: CI
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: activadee/codex-shared-workflows@v2
+        with:
+          command: auto-label
+          max_labels: 3
+        env:
+          CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
 
-on:
-  push:
-    branches: [main]
-  pull_request:
-
-jobs:
-  go-tests:
-    uses: activadee/codex-shared-workflows/.github/workflows/go-tests.yml@v1
-    with:
-      go_version_file: go.mod
-      test_flags: ./... -race -count=1
-
-  release:
-    uses: activadee/codex-shared-workflows/.github/workflows/release.yml@v1
-    secrets: inherit
-    with:
-      tag_name: v0.2.0
-      target: main
-      release_title: Codex SDK v0.2.0
-      draft: false
+  docs:
+    needs: review
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Sync documentation
+        uses: activadee/codex-shared-workflows@v2
+        with:
+          command: doc-sync
+          doc_globs: |
+            docs/**
+            **/*.md
+            README*
+        env:
+          CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
 ```
 
-### Secrets
+Available `with:` inputs mirror the CLI flags (see Command Reference). Every command accepts `model`, `effort`, `codex_args`, `codex_bin`, `dry_run`, and `prompt_path` overrides.
 
-Reusable workflows cannot access secrets from the workflow repository. Define required secrets in each calling repository (or at the organization/environment level) and forward them with `secrets: inherit` or explicit mappings.
+## CLI Usage
 
-Required secrets for `codex-review.yml`:
+Install via npm (local or CI) and call any workflow directly:
 
-- `CODEX_AUTH_JSON_B64` – Base64-encoded Codex `auth.json` (from ChatGPT subscription auth). The default `GITHUB_TOKEN` is available automatically.
-
-Required secrets for `release.yml`:
-
-- `CODEX_AUTH_JSON_B64` – Shared Codex credentials for generating release notes.
-
-Required secrets for `auto-label.yml`:
-
-- `CODEX_AUTH_JSON_B64` – Codex credentials for label generation.
-
-Required secrets for `codex-doc-sync.yml`:
-
-- `CODEX_AUTH_JSON_B64` – Codex credentials for analyzing diffs and editing documentation.
-
-### Optional inputs
-
-`codex-review.yml` accepts the following inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `safety_strategy` | `drop-sudo` | Passed through to the action. |
-| `prompt_extra` | _empty_ | Additional markdown appended to the shared prompt. |
-| `model` / `effort` | _empty_ | Optional overrides for Codex model and reasoning effort. |
-| `codex_args` | _empty_ | Extra flags forwarded to `codex exec`. |
-
-`go-tests.yml` inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `go_version` | _empty_ | Direct Go version; ignored if `go_version_file` is present. |
-| `go_version_file` | `go.mod` | File that specifies the Go version. |
-| `working_directory` | `.` | Directory where `go test` runs. |
-| `test_flags` | `./...` | Flags appended to `go test`. |
-| `enable_cache` | `true` | Toggle `actions/setup-go` module cache. |
-| `pre_test` | _empty_ | Optional shell snippet executed before `go test`. |
-
-`release.yml` inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `tag_name` | _(required)_ | Tag to publish (e.g. `v1.2.3`). |
-| `release_title` | _empty_ | Optional display name (falls back to tag). |
-| `target` | `main` | Commit/branch to release. |
-| `draft` | `false` | Whether to create the release as a draft. |
-| `go_version` | _empty_ | Explicit Go version; ignored if `go_version_file` is provided. |
-| `go_version_file` | `go.mod` | File declaring Go version. |
-| `run_tests` | `true` | Run `go test` before release. |
-| `test_flags` | `./...` | Flags passed to `go test`. |
-| `download_artifacts` | `false` | Download workflow artifacts before publishing the release. |
-| `artifacts_path` | `release-artifacts` | Directory for downloaded artifacts. |
-| `artifact_glob` | _empty_ | Newline-delimited glob(s) (relative to the workspace after download) uploaded with the release. |
-
-Outputs:
-
-- `release_notes` – Markdown generated for the release.
-
-`auto-label.yml` inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `max_labels` | `3` | Upper bound (1–3) on labels applied to each issue. |
-
-`codex-doc-sync.yml` inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `doc_globs` | `docs/**`, `**/*.md`, `README*` | Newline-separated glob list that defines which files count as documentation. |
-| `safety_strategy` | `drop-sudo` | Passed directly to `activadee/codex-action` (the workflow always runs with `sandbox-mode: danger-full-access`). |
-| `model` / `effort` | _empty_ | Optional overrides for Codex model and reasoning effort. |
-| `codex_args` | _empty_ | Additional CLI arguments forwarded to `codex exec`. |
-
-## Repository layout
-
+```bash
+npx codex-workflows review --prompt-extra "Focus on API contracts" --dry-run
+npx codex-workflows go-tests --go-version 1.22.5 --test-flags "./... -race"
+npx codex-workflows release --tag-name v1.3.0 --notes-extra "Highlights customer fixes"
+npx codex-workflows auto-label --max-labels 2
+npx codex-workflows doc-sync --doc-globs "docs/**\n**/*.md" --no-auto-push --dry-run
 ```
-.github/
-  actions/
-    codex-collect/      # Local composite action for gathering PR metadata.
-  prompts/
-    codex-review.md     # Shared prompt used by Codex review workflow.
-    codex-review-schema.json
-  scripts/
-    codex/
-      normalize-review.cjs
-      submit-review.js
-  workflows/
-    codex-review.yml
-    go-tests.yml
-```
+
+CLI execution shares the same environment conventions as the Action: export `CODEX_AUTH_JSON_B64`, `GITHUB_TOKEN`, and (optionally) `GH_TOKEN` before running commands.
+
+## Command Reference
+
+| Command | Purpose | Key Flags |
+| --- | --- | --- |
+| `review` | Generates a Codex PR review and submits it via `pulls.createReview`. | `--prompt`, `--prompt-extra`, `--model`, `--effort`, `--codex-args`, `--pull-number`, `--dry-run` |
+| `go-tests` | Installs (if requested) and runs `go test`. | `--go-version`, `--go-version-file`, `--working-directory`, `--test-flags`, `--pre-test`, `--env KEY=VALUE` |
+| `release` | Optionally runs Go tests, asks Codex for release notes, and creates/updates a GitHub release. | `--tag-name` (required), `--release-title`, `--target`, `--skip-tests`, `--notes-extra`, `--commit-limit`, Codex flags |
+| `auto-label` | Calls Codex to propose labels for an issue/PR and applies them. | `--prompt`, `--max-labels`, `--dry-run` |
+| `doc-sync` | Replaces the multi-job doc-sync workflow: prepares prompts, invokes Codex edits, verifies doc-only changes, commits, pushes, and comments. | `--doc-globs`, `--prompt-template`, `--safety-strategy`, `--no-auto-commit`, `--no-auto-push`, `--no-comment`, Codex flags |
+
+### `review`
+- Reads PR context from `GITHUB_EVENT_PATH` or `--pull-number`.
+- Builds diff context (`listFiles`) and streams it into `codex exec` using `.github/prompts/codex-review.md` by default.
+- Posts Codex output as a standard PR review comment; `--dry-run` prints to stdout.
+
+### `go-tests`
+- Optionally installs Go via `@actions/tool-cache` (respecting `--go-version` or `--go-version-file`).
+- Runs `pre-test` shell snippets before executing `go test` with parsed flags.
+- Accepts additional env vars through repeated `--env KEY=VALUE` options or multiline `env` action input.
+
+### `release`
+- Reuses `go-tests` plumbing (unless `--skip-tests`).
+- Fetches recent commits (`commit_limit`, default 50) and feeds the summary plus `notes_extra` into `.github/prompts/codex-release-template.md`.
+- Calls GitHub Releases API to create/update the tag and logs the release URL (also printed in action logs).
+
+### `auto-label`
+- Uses `.github/prompts/codex-auto-label.md` to instruct Codex to return a JSON array of labels.
+- Ensures labels exist (creates when missing) and applies them via `issues.addLabels` unless `--dry-run` is set.
+
+### `doc-sync`
+- Collapses the previous `prepare_inputs`, `edit_docs`, and `push_docs` jobs into one command.
+- Writes doc scope manifests + commit summaries, renders `.github/prompts/codex-doc-sync.md`, and exports the same env vars (`DOC_REPORT_PATH`, etc.) used by the original workflow to keep prompts intact.
+- After Codex runs, verifies that only documentation globs changed, saves the file list + patch, optionally commits (`[skip ci][doc-sync] Auto-update docs for PR #N`), pushes to the head branch, and comments with the generated report.
+- `--doc-globs` accepts newline-separated patterns; use `--no-auto-commit`/`--no-auto-push` if you want to inspect results manually.
+
+## Migration Guide
+
+| Legacy reusable workflow | New action invocation |
+| --- | --- |
+| `.github/workflows/codex-review.yml` | `uses: activadee/codex-shared-workflows@v2` + `with: command: review` |
+| `.github/workflows/go-tests.yml` | `uses: activadee/codex-shared-workflows@v2` + `with: command: go-tests` |
+| `.github/workflows/release.yml` | `with: command: release` (same inputs as before). |
+| `.github/workflows/auto-label.yml` | `with: command: auto-label` |
+| `.github/workflows/codex-doc-sync.yml` | `with: command: doc-sync` |
+
+Steps:
+
+1. Remove `uses: activadee/codex-shared-workflows/.github/workflows/...` references.
+2. Replace them with a single job that runs this action and passes `command` + the same inputs as before.
+3. Ensure secrets (`CODEX_AUTH_JSON_B64`, `GITHUB_TOKEN`) remain available; doc-sync requires `contents` **and** `pull-requests` permissions so it can push commits and comment.
+4. (Optional) Install the CLI locally to develop prompts or run workflows outside Actions: `npm install --save-dev activadee/codex-shared-workflows && npx codex-workflows review --dry-run`.
 
 ## Development
 
-1. Duplicate the workflows into a feature branch and modify as needed.
-2. Use a sandbox repository to consume the branch ref (`@feature-branch`) and verify behavior.
-3. Once validated, tag a release (e.g., `v1.0.0`) so downstream repos can pin to an immutable reference.
+- Install dependencies: `npm install` (runs `tsup` via `prepare`).
+- Lint/tests/type-check: `npm run verify`.
+- Watch mode: `npm run dev`.
+- Build distributable artifacts: `npm run build` (generates `dist/index.cjs` for the CLI binary and `dist/action.cjs` for GitHub Actions).
 
-## Limitations
+## Secrets recap
 
-- GitHub does not allow reusable workflows to access secrets or protected variables defined in this repository. Consumers must define required secrets themselves or inherit them from an organization/environment.
-- The review workflow assumes a pull request event; if invoked from other events, required context such as `github.event.pull_request` is missing and the workflow will exit early.
+| Command | Required secrets |
+| --- | --- |
+| `review`, `auto-label`, `release`, `doc-sync` | `CODEX_AUTH_JSON_B64`, `GITHUB_TOKEN` (actions runtime) |
+| `go-tests` | none (unless your tests hit private resources). |
+| `doc-sync` | needs permission to push + comment, so configure the job with `permissions: { contents: write, pull-requests: write }` and ensure forks are disallowed (the command enforces same-repo branches by default). |
+
+The repo keeps the existing prompt files under `.github/prompts/*`; update those to change Codex behavior globally.
