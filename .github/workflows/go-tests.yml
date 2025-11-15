@@ -33,6 +33,31 @@ on:
         required: false
         type: string
         default: ""
+      cache_dependency_path:
+        description: Optional glob(s) for cache dependency hashing (newline-delimited).
+        required: false
+        type: string
+        default: ""
+      coverage_profile:
+        description: Optional coverprofile path (relative to working_directory).
+        required: false
+        type: string
+        default: ""
+      upload_coverage_artifact:
+        description: Upload the generated coverage profile as an artifact.
+        required: false
+        type: boolean
+        default: false
+      coverage_artifact_name:
+        description: Artifact name when uploading coverage.
+        required: false
+        type: string
+        default: go-coverage
+      race:
+        description: Run go test with -race.
+        required: false
+        type: boolean
+        default: false
     secrets: {}
 
 permissions:
@@ -45,18 +70,40 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Checkout shared automation assets
+        uses: actions/checkout@v5
+        with:
+          repository: activadee/codex-shared-workflows
+          ref: ${{ github.action_ref || 'main' }}
+          path: __codex_shared
+
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: ./__codex_shared/actions/go/setup
         with:
           go-version: ${{ inputs.go_version }}
           go-version-file: ${{ inputs.go_version_file }}
-          cache: ${{ inputs.enable_cache }}
+          enable-cache: ${{ inputs.enable_cache }}
+          cache-dependency-path: ${{ inputs.cache_dependency_path }}
 
       - name: Pre-test setup
-        if: inputs.pre_test != ''
-        working-directory: ${{ inputs.working_directory }}
-        run: ${{ inputs.pre_test }}
+        uses: ./__codex_shared/actions/go/pre-test
+        with:
+          script: ${{ inputs.pre_test }}
+          working-directory: ${{ inputs.working_directory }}
 
       - name: Run go test
-        working-directory: ${{ inputs.working_directory }}
-        run: go test ${{ inputs.test_flags }}
+        id: run_tests
+        uses: ./__codex_shared/actions/go/test
+        with:
+          working-directory: ${{ inputs.working_directory }}
+          test-flags: ${{ inputs.test_flags }}
+          coverage-profile: ${{ inputs.coverage_profile }}
+          race: ${{ inputs.race }}
+
+      - name: Upload coverage artifact
+        if: inputs.upload_coverage_artifact && steps.run_tests.outputs.coverage_profile_abs != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.coverage_artifact_name }}
+          path: ${{ steps.run_tests.outputs.coverage_profile_abs }}
+          if-no-files-found: ignore
