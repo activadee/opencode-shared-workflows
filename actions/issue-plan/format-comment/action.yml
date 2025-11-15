@@ -1,0 +1,139 @@
+name: "Format Codex issue-plan comment"
+description: "Convert Codex JSON output into a markdown issue comment and expose it for posting."
+inputs:
+  output-path:
+    description: "Path to the Codex JSON output file."
+    required: false
+    default: "codex-output.json"
+  issue-number:
+    description: "Issue number being commented on (for metadata section)."
+    required: false
+    default: ""
+  issue-url:
+    description: "Issue URL for link rendering."
+    required: false
+    default: ""
+  issue-title:
+    description: "Issue title shown in the comment header."
+    required: false
+    default: ""
+  comment-path:
+    description: "Destination markdown file for the rendered comment."
+    required: false
+    default: "issue-plan-comment.md"
+  payload-path:
+    description: "Destination JSON payload (body wrapper)."
+    required: false
+    default: "issue-plan-comment.json"
+outputs:
+  summary:
+    description: "Summary string returned by Codex."
+    value: ${{ steps.format.outputs.summary }}
+  plan_markdown:
+    description: "Plan markdown string returned by Codex."
+    value: ${{ steps.format.outputs.plan_markdown }}
+  comment_path:
+    description: "Markdown file containing the rendered comment."
+    value: ${{ steps.format.outputs.comment_path }}
+  comment_payload_path:
+    description: "JSON payload file suitable for gh api."
+    value: ${{ steps.format.outputs.comment_payload_path }}
+runs:
+  using: "composite"
+  steps:
+    - id: format
+      shell: bash
+      env:
+        OUTPUT_PATH: ${{ inputs.output-path }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
+        ISSUE_URL: ${{ inputs.issue-url }}
+        ISSUE_TITLE: ${{ inputs.issue-title }}
+        COMMENT_PATH: ${{ inputs.comment-path }}
+        PAYLOAD_PATH: ${{ inputs.payload-path }}
+      run: |
+        set -euo pipefail
+        if [ ! -f "$OUTPUT_PATH" ]; then
+          echo "::error::Missing Codex output at $OUTPUT_PATH" >&2
+          exit 1
+        fi
+        python3 <<'PY'
+import json
+import os
+from pathlib import Path
+
+output_path = Path(os.environ['OUTPUT_PATH'])
+data = json.loads(output_path.read_text())
+
+plan = (data.get('plan_markdown') or '').strip()
+if not plan:
+    raise SystemExit('Codex response missing plan_markdown')
+
+summary = (data.get('summary') or '').strip()
+risks = [item.strip() for item in data.get('risks', []) if isinstance(item, str) and item.strip()]
+dependencies = [item.strip() for item in data.get('dependencies', []) if isinstance(item, str) and item.strip()]
+questions = [item.strip() for item in data.get('open_questions', []) if isinstance(item, str) and item.strip()]
+next_steps = [item.strip() for item in data.get('next_steps', []) if isinstance(item, str) and item.strip()]
+confidence = (data.get('confidence') or '').strip()
+effort = (data.get('estimated_effort') or '').strip()
+
+issue_number = (os.environ.get('ISSUE_NUMBER') or '').strip()
+issue_url = (os.environ.get('ISSUE_URL') or '').strip()
+issue_title_env = (os.environ.get('ISSUE_TITLE') or '').strip()
+if issue_title_env:
+    issue_title = issue_title_env
+elif issue_number:
+    issue_title = f"Issue #{issue_number}"
+else:
+    issue_title = "Issue"
+
+lines = ["### 🧩 Codex Implementation Plan"]
+if issue_number:
+    display = issue_title or f"Issue #{issue_number}"
+    if issue_url:
+        lines.append(f"**Issue:** [{display}]({issue_url}) (#{issue_number})")
+    else:
+        lines.append(f"**Issue:** {display} (#{issue_number})")
+
+if summary:
+    lines.append(f"**Summary:** {summary}")
+if confidence:
+    lines.append(f"**Confidence:** {confidence}")
+if effort:
+    lines.append(f"**Estimated Effort:** {effort}")
+
+lines.append("")
+lines.append(plan)
+
+def block(label, items):
+    if not items:
+        return None
+    joined = "\n".join(f"- {item}" for item in items)
+    return f"#### {label}\n{joined}"
+
+for section in [
+    block("Additional Risks", risks),
+    block("Dependencies", dependencies),
+    block("Open Questions", questions),
+    block("Immediate Next Steps", next_steps),
+]:
+    if section:
+        lines.append("\n" + section)
+
+comment_text = "\n".join(lines).strip() + "\n"
+
+comment_path = Path(os.environ['COMMENT_PATH'])
+comment_path.write_text(comment_text)
+
+payload_path = Path(os.environ['PAYLOAD_PATH'])
+payload_path.write_text(json.dumps({"body": comment_text}, indent=2))
+
+with open(os.environ['GITHUB_OUTPUT'], 'a') as fh:
+    fh.write(f"comment_path={comment_path}\n")
+    fh.write(f"comment_payload_path={payload_path}\n")
+    fh.write("summary<<EOF\n")
+    fh.write(summary + "\n")
+    fh.write("EOF\n")
+    fh.write("plan_markdown<<EOF\n")
+    fh.write(plan + "\n")
+    fh.write("EOF\n")
+PY

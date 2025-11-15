@@ -19,6 +19,8 @@ Reusable GitHub Actions workflows for Codex-enabled repositories. These workflow
 - `.github/workflows/doc-sync.yml`  
   Invokes Codex on pull requests to review the current diff, edit the necessary documentation files, and push a `[skip ci][skip github-actions]` commit directly from the workflow (no follow-up jobs needed). Network access stays enabled inside the sandbox because the workflow passes `--config sandbox_workspace_write.network_access=true` through `codex-args`, so Codex can reach web search or `gh` without falling back to `danger-full-access`.
 
+- `.github/workflows/issue-plan.yml`  
+  Reads an issue plus repository context on `main`, has Codex (GPT-5.1-codex / high effort with network access) draft an implementation plan, and posts that plan back to the issue via the GitHub CLI using the forwarded `GH_TOKEN`.
 
 ## Using the workflows
 
@@ -93,6 +95,10 @@ Required secrets for `doc-sync.yml`:
 
 - `CODEX_AUTH_JSON_B64` – Codex credentials used to generate documentation updates.
 
+Required secrets for `issue-plan.yml`:
+
+- `CODEX_AUTH_JSON_B64` – Codex credentials for drafting the implementation plan (the workflow also relies on the caller-provided `GITHUB_TOKEN`/`GH_TOKEN` to read and comment on issues).
+
 ### Optional inputs
 
 `codex-review.yml` accepts the following inputs:
@@ -165,6 +171,28 @@ Outputs:
 | `codex_args` | _empty_ | Extra CLI arguments forwarded to `codex exec`. |
 | `create_missing_labels` | `true` | Allow creating labels that don’t exist yet. |
 
+`issue-plan.yml` inputs:
+
+| Input | Default | Notes |
+| --- | --- | --- |
+| `target_ref` | `main` | Branch/ref that Codex should analyze when building the plan. |
+| `issue_number` | _empty_ | Override when the calling workflow is not triggered by an issue event. |
+| `prompt_extra` | _empty_ | Additional markdown appended after the shared prompt template. |
+| `model` | `gpt-5.1-codex` | Codex model used for planning. |
+| `effort` | `high` | Reasoning effort passed to Codex. |
+| `safety_strategy` | `drop-sudo` | Codex sandbox mode. |
+| `codex_args` | `["--config","sandbox_workspace_write.network_access=true"]` | Ensures Codex keeps workspace-write sandboxing but has outbound network (for issue lookup/search). |
+| `pass_through_env` | `GH_TOKEN,GITHUB_TOKEN` | Env vars forwarded into Codex so it can run `gh`/`git` commands as needed. |
+| `max_issue_body_chars` | `8000` | Max characters copied from the issue body. |
+| `max_comment_body_chars` | `2000` | Max characters per embedded comment. |
+| `max_comments` | `6` | Number of the most recent comments appended to the prompt. |
+
+Outputs:
+
+- `summary` – Short synopsis returned by Codex.
+- `plan_markdown` – Full markdown plan that was posted to the issue.
+- `comment_url` – Link to the GitHub comment created via `gh`.
+
 `doc-sync.yml` inputs:
 
 | Input | Default | Notes |
@@ -183,7 +211,7 @@ Outputs:
 
 ## Repository layout
 
-```
+``` bash
 prompts/
   codex-review.md
   codex-review-schema.json
@@ -191,6 +219,8 @@ prompts/
   codex-release-schema.json
   codex-auto-label.md
   codex-auto-label-schema.json
+  codex-issue-plan.md
+  codex-issue-plan-schema.json
 actions/
   common/
     checkout-target/
@@ -218,6 +248,9 @@ actions/
     prepare/
     build-prompt/
     edit/
+  issue-plan/
+    prepare/
+    format-comment/
 workflows/
 workflow-templates/
 cli/
