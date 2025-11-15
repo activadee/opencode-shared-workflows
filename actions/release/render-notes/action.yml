@@ -43,5 +43,5 @@ runs:
         {
           echo "notes<<'EOF'"
           cat "$NOTES_PATH"
-          echo "EOF"
+          echo "'EOF'"
         } >> "$GITHUB_OUTPUT"
