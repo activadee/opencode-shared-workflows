@@ -29,6 +29,9 @@ jobs:
             README.md
           network_access: true
           web_search: false
+          approval_policy: 'untrusted'
+          model: 'gpt-5.1'
+          effort: 'high'
         env:
           CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
           GITHUB_TOKEN: ${{ github.token }}
