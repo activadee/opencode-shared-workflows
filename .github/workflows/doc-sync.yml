@@ -135,9 +135,9 @@ jobs:
           prompt-path: ${{ steps.prompt.outputs.prompt_path }}
           output-schema: ${{ steps.prompt.outputs.output_schema }}
           safety-strategy: ${{ inputs.safety_strategy }}
+          codex-args: ${{ inputs.codex_args }}
           model: ${{ inputs.model }}
           effort: ${{ inputs.effort }}
-          codex-args: ${{ inputs.codex_args }}
           pass-through-env: ${{ inputs.pass_through_env }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
