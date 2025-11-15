@@ -133,21 +133,14 @@ codex-automation-hub/
 2. Create `tests/actions/auto-label.yml` to smoke-test the workflow via `act`.
 
 ### 5. `codex-doc-sync.yml`
-**Current state.** Three-job workflow (`prepare_inputs`, `edit_docs`, `push_docs`) relying heavily on bespoke composite actions (`doc-sync-*`). Requires repeated checkouts and manual artifact juggling; logs are complex and failures are hard to debug.
+**Status.** Refactor complete:
+- Scripts now live under `actions/doc-sync/lib` and power the new composites (`context`, `prepare`, `build-prompt`, `edit`, `push`). Legacy `.github/actions/doc-sync-*` delegate to the new versions.
+- Workflow references the new composites (`./__codex_shared/actions/doc-sync/*`), uses the latest template path, and keeps branch pinning via `github.action_ref`.
+- Documentation scope + commit summary logic stays the same but is easier to consume elsewhere; future CLI work can call these composites directly.
 
-**Target architecture.**
-- Promote the existing `doc-sync-*` composites into a structured suite under `actions/doc-sync/*`, each with clear inputs/outputs and shared utility library (Node package) to parse diffs, format prompts, and apply patches.
-- Introduce state machine orchestration: `prepare` job produces a signed manifest (JSON) describing doc globs, prompt path, and diff metadata. `edit` job consumes manifest, runs Codex edits using CLI action, and emits patch/report artifacts. `push` job verifies patch cleanly applies, pushes branch, and posts summary.
-- Reusable workflow adds resiliency features (max retries, fallback to summary-only mode) plus outputs (changed files list, doc report path). Provide toggles to skip push phase for dry runs.
-- CLI command `codex doc-sync` shares manifest format, enabling local testing (apply patch locally, review doc summary).
-
-**Implementation steps.**
-1. Consolidate doc-sync actions into `actions/doc-sync` directory, adding a shared Node helper package for git/diff operations. Publish it so both actions and CLI reuse logic.
-2. Standardize artifact naming with manifest file (e.g., `doc-sync-manifest.json`). `prepare` job writes manifest + prompt to artifact; `edit` job produces `doc-sync-result.json` with summary + patch metadata.
-3. Replace shell-based ignore logic with composite action that updates `.git/info/exclude` deterministically.
-4. Enhance `doc-sync-edit` composite to output structured telemetry (tokens, elapsed time) and optionally chunk doc edits by glob groups.
-5. Update workflow YAML to call new composites, support concurrency key per PR, and integrate with CLI-based manual approval (optional `requires_approval` input that halts before push).
-6. Write doc/diagram describing doc-sync state machine and failure-handling (skip, retry, manual patch). Add tests with synthetic repos to ensure patch application works.
+**Follow-ups.**
+1. Add dry-run support / manifest outputs before enabling CLI parity.
+2. Author `tests/actions/doc-sync.yml` for `actionlint` + `act` smoke testing once fixtures exist.
 
 ---
 
@@ -180,7 +173,7 @@ codex-automation-hub/
   - [x] Modularize `go-tests.yml` (actions/go, docs/workflows/go-tests.md, README/plan updates); tests pending.
   - [x] Modularize `release.yml` (actions/release, docs/workflows/release.md, README/plan updates); tests pending.
   - [x] Refactor `auto-label.yml` (actions/auto-label, docs/workflows/auto-label.md); additional filtering/tests pending.
-  - [ ] Refactor `codex-doc-sync.yml` (planned).
+  - [x] Refactor `codex-doc-sync.yml` (actions/doc-sync, docs/workflows/codex-doc-sync.md); dry-run/tests pending.
 - [ ] **Phase 3 – CLI + templates**
 - [ ] **Phase 4 – Adoption / deprecation**
 

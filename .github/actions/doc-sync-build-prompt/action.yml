@@ -34,17 +34,14 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Build prompt
-      shell: bash
-      env:
-        BASE_REF: ${{ inputs.base_ref }}
-        HEAD_REF: ${{ inputs.head_ref }}
-        PR_NUMBER: ${{ inputs.pr_number }}
-        REPOSITORY: ${{ inputs.repository }}
-        REPORT_PATH: ${{ inputs.report_path }}
-        TEMPLATE_PATH: ${{ inputs.template_path }}
-        DOC_GLOBS_PATH: ${{ inputs.doc_globs_path }}
-        PROMPT_PATH: ${{ inputs.prompt_path }}
-        COMMITS_PATH: ${{ inputs.commits_path }}
-        SHARED_PATH: ${{ inputs.shared_path }}
-      run: node "$SHARED_PATH/.github/scripts/doc-sync/prepare_prompt.js"
+    - uses: ../../actions/doc-sync/build-prompt
+      with:
+        base_ref: ${{ inputs.base_ref }}
+        head_ref: ${{ inputs.head_ref }}
+        pr_number: ${{ inputs.pr_number }}
+        repository: ${{ inputs.repository }}
+        report_path: ${{ inputs.report_path }}
+        doc_globs_path: ${{ inputs.doc_globs_path }}
+        prompt_path: ${{ inputs.prompt_path }}
+        commits_path: ${{ inputs.commits_path }}
+        template_path: ${{ inputs.template_path }}

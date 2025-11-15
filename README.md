@@ -206,6 +206,12 @@ actions/
     prepare-prompt/
     generate-highlights/
     render-notes/
+  doc-sync/
+    context/
+    prepare/
+    build-prompt/
+    edit/
+    push/
 workflows/
 workflow-templates/
 cli/

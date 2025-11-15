@@ -64,7 +64,7 @@ jobs:
     steps:
       - name: Resolve pull request context
         id: context
-        uses: activadee/codex-shared-workflows/.github/actions/doc-sync-context@main
+        uses: ./__codex_shared/actions/doc-sync/context
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -83,7 +83,7 @@ jobs:
 
       - name: Prepare workspace
         if: steps.context.outputs.proceed == 'true'
-        uses: activadee/codex-shared-workflows/.github/actions/doc-sync-prepare@main
+        uses: ./__codex_shared/actions/doc-sync/prepare
         with:
           base_ref: ${{ steps.context.outputs.base_ref }}
           head_sha: ${{ steps.context.outputs.head_sha }}
@@ -91,11 +91,10 @@ jobs:
           doc_commits_path: ${{ env.DOC_COMMITS_PATH }}
           doc_globs_file: ${{ env.DOC_GLOBS_FILE }}
           doc_globs: ${{ inputs.doc_globs }}
-          shared_path: __codex_shared
 
       - name: Build Codex prompt
         if: steps.context.outputs.proceed == 'true'
-        uses: activadee/codex-shared-workflows/.github/actions/doc-sync-build-prompt@main
+        uses: ./__codex_shared/actions/doc-sync/build-prompt
         with:
           base_ref: ${{ steps.context.outputs.base_ref }}
           head_ref: ${{ steps.context.outputs.head_ref }}
@@ -106,7 +105,6 @@ jobs:
           doc_globs_path: ${{ env.DOC_GLOBS_FILE }}
           prompt_path: codex_prompt.md
           commits_path: ${{ env.DOC_COMMITS_PATH }}
-          shared_path: __codex_shared
 
       - name: Upload doc-sync inputs
         if: steps.context.outputs.proceed == 'true'
@@ -150,7 +148,7 @@ jobs:
         uses: actions/checkout@v5
         with:
           repository: activadee/codex-shared-workflows
-          ref: main
+          ref: ${{ github.action_ref || 'main' }}
           path: __codex_shared
 
       - name: Restore doc-sync inputs
@@ -176,7 +174,7 @@ jobs:
 
       - name: Run Codex doc sync edits
         id: edit
-        uses: activadee/codex-shared-workflows/.github/actions/doc-sync-edit@main
+        uses: ./__codex_shared/actions/doc-sync/edit
         with:
           codex_auth_json_b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
           prompt_path: doc-sync-inputs/codex_prompt.md
@@ -189,7 +187,6 @@ jobs:
           head_sha: ${{ needs.prepare_inputs.outputs.head_sha }}
           pr_number: ${{ needs.prepare_inputs.outputs.pr_number }}
           repository: ${{ needs.prepare_inputs.outputs.repository }}
-          shared_path: __codex_shared
           safety_strategy: ${{ inputs.safety_strategy }}
           model: ${{ inputs.model }}
           effort: ${{ inputs.effort }}
@@ -255,7 +252,7 @@ jobs:
 
       - name: Apply and push documentation updates
         id: push_action
-        uses: activadee/codex-shared-workflows/.github/actions/doc-sync-push@main
+        uses: ./__codex_shared/actions/doc-sync/push
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           doc_patch_file: doc-sync-artifacts/${{ env.DOC_PATCH_FILE }}
