@@ -37,7 +37,8 @@ export const collectCommitSummary = async (options: {
 }) => {
   const { baseRef, headRef, headSha, outputPath } = options;
   const abs = path.resolve(outputPath);
-  const range = headRef ? [`origin/${baseRef}..${headRef}`] : [`origin/${baseRef}..HEAD`];
+  const headSpecifier = headSha ?? headRef ?? 'HEAD';
+  const range = [`origin/${baseRef}..${headSpecifier}`];
   try {
     await runCommand({ command: 'git', args: ['fetch', '--no-tags', 'origin', baseRef] });
   } catch (error) {
