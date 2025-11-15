@@ -197,6 +197,7 @@ export const registerDocSyncCommand = (program: Command) => {
         model: opts.model,
         effort: opts.effort,
         sandboxMode: "workspace-write",
+        approvalPolicy: 'untrusted',
         extraEnv,
         networkAccessEnabled: Boolean(opts.enableNetwork),
         webSearchEnabled: Boolean(opts.enableWebSearch)

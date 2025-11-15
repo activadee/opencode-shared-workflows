@@ -1,4 +1,10 @@
-import type { ModelReasoningEffort, SandboxMode, ThreadEvent, ThreadItem } from '@openai/codex-sdk';
+import type {
+  ApprovalMode,
+  ModelReasoningEffort,
+  SandboxMode,
+  ThreadEvent,
+  ThreadItem
+} from '@openai/codex-sdk';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -21,6 +27,7 @@ export interface CodexRunOptions {
   outputSchemaPath?: string;
   networkAccessEnabled?: boolean;
   webSearchEnabled?: boolean;
+  approvalPolicy?: ApprovalMode;
 }
 
 const decodeCodexAuth = (): string | undefined => {
@@ -153,7 +160,8 @@ export class CodexClient {
         workingDirectory: options.workingDirectory,
         skipGitRepoCheck: options.skipGitRepoCheck,
         networkAccessEnabled: options.networkAccessEnabled ?? false,
-        webSearchEnabled: options.webSearchEnabled ?? false
+        webSearchEnabled: options.webSearchEnabled ?? false,
+        approvalPolicy: options.approvalPolicy
       });
 
       const streamed = await thread.runStreamed(payload, { outputSchema });
