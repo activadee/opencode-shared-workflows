@@ -71,9 +71,9 @@ codex-automation-hub/
 ## Cross-cutting Refactor Tasks
 1. **Common utilities.** Extract repeated checkout/prompt/artifact logic into `actions/common/*` composites so each workflow can reference `uses: ./actions/common/...`. Provide Node helpers under `pkg/` (or `cli/internal/`) and share them between actions and the CLI.
 2. **CLI + shared prompts.** Move prompts/schemas from `.github/prompts/*` to `prompts/` at the repo root. Wrap them in the CLI so developers can run `codex review --local` before pushing. Ensure CLI reuses the same actions package via a shared `pkg/codex` module.
-3. **Testing + linting.** Add `tests/actions/<workflow>.yml` to run `actionlint`, smoke-run composites via `act`, and unit-test CLI commands. Hook these tests into `workflows/test-actions.yml` and `workflows/lint-cli.yml`.
+3. **Testing + linting.** Add `tests/actions/<workflow>.yml` to run `actionlint`, smoke-run composites via `act`, and unit-test CLI commands. Hook these tests into `.github/workflows/test-actions.yml` and `lint-cli.yml`.
 4. **Versioning + releases.** Define semantic tags for actions (`v1`, `v1.1.0`), workflows, and CLI releases. Document promotion steps in `docs/releasing.md`.
-5. **Migration guides.** For every workflow, ship a doc with: feature parity matrix, migration instructions (replace `activadee/codex-shared-workflows/workflows/foo.yml@main` with `org/codex-automation-hub/workflows/foo.yml@v1`), and CLI equivalents.
+5. **Migration guides.** For every workflow, ship a doc with: feature parity matrix, migration instructions (replace `activadee/codex-shared-workflows/.github/workflows/foo.yml@main` with `org/codex-automation-hub/.github/workflows/foo.yml@v1`), and CLI equivalents.
 
 ---
 
@@ -95,7 +95,7 @@ codex-automation-hub/
 1. Port `.github/actions/codex-collect`, `scripts/codex/*.js`, and prompt logic into `actions/codex-review/*`. Replace Node scripts with TypeScript packaged via `@actions/core` (transpiled to `dist/`).
 2. Introduce `actions/common/checkout-target` (takes ref/SHA, fetch-depth, optional sparse) and `actions/common/checkout-shared-assets` (clones this repo only when necessary). Update the workflow to depend on these composites.
 3. Update `codex-review.yml` to call composites sequentially. Remove inline shell prompt concatenation; rely on outputs from `prepare-prompt`.
-4. Add `workflows/codex-review.yml` tests using `act` to simulate PR inputs; ensure failure artifacts upload path matches new names.
+4. Add `.github/workflows/codex-review.yml` tests using `act` to simulate PR inputs; ensure failure artifacts upload path matches new names.
 5. Document CLI equivalence and fallback instructions in `docs/workflows/codex-review.md`.
 6. Release `v1.0.0` tag that includes the modularized workflow + composites.
 
@@ -135,7 +135,7 @@ codex-automation-hub/
 ### 5. `codex-doc-sync.yml`
 **Status.** Refactor complete:
 - Scripts now live under `actions/doc-sync/lib` and power the new composites (`context`, `prepare`, `build-prompt`, `edit`, `push`). Legacy `.github/actions/doc-sync-*` delegate to the new versions.
-- Workflow references the new composites (`./__codex_shared/actions/doc-sync/*`), uses the latest template path, and keeps branch pinning via `github.action_ref`.
+- Workflow references the published composites (`activadee/codex-shared-workflows/actions/doc-sync/*@tag`) and keeps branch pinning via `github.action_ref`.
 - Documentation scope + commit summary logic stays the same but is easier to consume elsewhere; future CLI work can call these composites directly.
 
 **Follow-ups.**
