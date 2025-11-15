@@ -79,6 +79,7 @@ export const registerAutoLabelCommand = (program: Command) => {
         input,
         model: opts.model,
         effort: opts.effort,
+        sandboxMode: "workspace-write",
         outputSchemaPath: path.resolve(AUTO_LABEL_SCHEMA),
         networkAccessEnabled: Boolean(opts.enableNetwork),
         webSearchEnabled: Boolean(opts.enableWebSearch)

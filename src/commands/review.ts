@@ -114,6 +114,7 @@ export const registerReviewCommand = (program: Command) => {
         input,
         model: opts.model,
         effort: opts.effort,
+        sandboxMode: "workspace-write",
         outputSchemaPath: path.resolve(REVIEW_SCHEMA),
         networkAccessEnabled: Boolean(opts.enableNetwork),
         webSearchEnabled: Boolean(opts.enableWebSearch)

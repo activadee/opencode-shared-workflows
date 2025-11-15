@@ -106,6 +106,7 @@ export const registerReleaseCommand = (program: Command) => {
           input,
           model: opts.model,
           effort: opts.effort,
+          sandboxMode: "workspace-write",
           outputSchemaPath: path.resolve(RELEASE_SCHEMA),
           networkAccessEnabled: Boolean(opts.enableNetwork),
           webSearchEnabled: Boolean(opts.enableWebSearch)
