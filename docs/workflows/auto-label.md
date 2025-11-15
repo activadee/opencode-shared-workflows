@@ -36,4 +36,3 @@ auto-label:
 
 ## Notes / TODOs
 - Future enhancements: label allowlist/blocklist filtering and dry-run previews.
-- Corresponding composite implementations live under `actions/auto-label/*` and are shared with legacy `.github/actions/auto-label-*` wrappers for backward compatibility.

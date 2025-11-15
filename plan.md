@@ -170,10 +170,10 @@ codex-automation-hub/
   - [x] Update `codex-review.yml` to consume the new composites (still using local checkout until remote pinning strategy is finalized).
   - [ ] Publish guidance/tests ensuring the new composites work under `workflow_call` consumers.
 - [ ] **Phase 2 – Rework remaining workflows**
-  - [x] Modularize `go-tests.yml` (actions/go, docs/workflows/go-tests.md, README/plan updates); tests pending.
-  - [x] Modularize `release.yml` (actions/release, docs/workflows/release.md, README/plan updates); tests pending.
-  - [x] Refactor `auto-label.yml` (actions/auto-label, docs/workflows/auto-label.md); additional filtering/tests pending.
-  - [x] Refactor `codex-doc-sync.yml` (actions/doc-sync, docs/workflows/codex-doc-sync.md); dry-run/tests pending.
+  - [x] Modularize `go-tests.yml` (actions/go, docs/workflows/go-tests.md, README/plan updates); `act` tests intentionally skipped for now.
+  - [x] Modularize `release.yml` (actions/release, docs/workflows/release.md, README/plan updates); `act` tests intentionally skipped for now.
+  - [x] Refactor `auto-label.yml` (actions/auto-label, docs/workflows/auto-label.md); extra filtering + tests deferred.
+  - [x] Refactor `codex-doc-sync.yml` (actions/doc-sync, docs/workflows/codex-doc-sync.md); dry-run/tests deferred.
 - [ ] **Phase 3 – CLI + templates**
 - [ ] **Phase 4 – Adoption / deprecation**
 

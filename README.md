@@ -220,13 +220,6 @@ docs/
 tests/
 scripts/
 .github/
-  actions/
-    codex-collect/
-    auto-label-prepare/
-    auto-label-apply/
-    doc-sync-*/
-  scripts/
-    doc-sync/
   workflows/
     codex-review.yml
     go-tests.yml
