@@ -91,7 +91,7 @@ Required secrets for `auto-label.yml`:
 
 Required secrets for `doc-sync.yml`:
 
-- `CODEX_AUTH_JSON_B64` – Codex credentials used to generate documentation patches.
+- `CODEX_AUTH_JSON_B64` – Codex credentials used to generate documentation updates.
 
 ### Optional inputs
 

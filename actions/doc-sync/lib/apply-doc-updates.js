@@ -2,13 +2,9 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
-const { spawnSync } = require('child_process');
-
 const OUTPUT_PATH = process.env.CODEX_DOC_SYNC_OUTPUT_PATH || 'codex-output.json';
 const ALLOWLIST_PATH = process.env.CODEX_DOC_SYNC_ALLOWLIST_PATH || 'doc-allowlist.json';
 const SUMMARY_PATH = process.env.CODEX_DOC_SYNC_SUMMARY_PATH || 'doc-sync-summary.json';
-const PATCH_DIR = process.env.CODEX_DOC_SYNC_PATCH_DIR || 'doc-sync-patches';
 
 const readJson = (file) => {
   if (!fs.existsSync(file)) {
@@ -22,39 +18,13 @@ const readJson = (file) => {
   }
 };
 
-const ensureDir = (dir) => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-};
-
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 const allowlist = new Set(readJson(ALLOWLIST_PATH));
 const output = readJson(OUTPUT_PATH);
 const edits = Array.isArray(output.edits) ? output.edits : [];
 const followUps = Array.isArray(output.follow_ups) ? output.follow_ups : [];
 const summary = typeof output.summary === 'string' ? output.summary.trim() : '';
 
-ensureDir(PATCH_DIR);
-
 const applied = [];
-
-const normalizePatch = (patch, filePath) => {
-  if (typeof patch !== 'string' || patch.trim().length === 0) {
-    return null;
-  }
-  const normalized = patch.replace(/\r\n/g, '\n').trim();
-  if (!normalized.length) {
-    return null;
-  }
-  const headerPattern = new RegExp(`^---\\s+(?:a/)?${escapeRegExp(filePath)}$`, 'm');
-  if (headerPattern.test(normalized)) {
-    return normalized.endsWith('\n') ? normalized : `${normalized}\n`;
-  }
-  const withHeaders = `--- a/${filePath}\n+++ b/${filePath}\n${normalized}\n`;
-  return withHeaders;
-};
 
 for (let index = 0; index < edits.length; index += 1) {
   const edit = edits[index];
@@ -71,20 +41,15 @@ for (let index = 0; index < edits.length; index += 1) {
   if (!fs.existsSync(targetPath)) {
     throw new Error(`Edit #${index + 1} references ${targetPath}, but the file does not exist in the workspace.`);
   }
-  const patch = normalizePatch(edit.patch, targetPath);
-  if (!patch) {
-    throw new Error(`Edit #${index + 1} for ${targetPath} did not supply a valid patch.`);
+  const content = typeof edit.content === 'string' ? edit.content : null;
+  if (content === null) {
+    throw new Error(`Edit #${index + 1} for ${targetPath} is missing replacement content.`);
   }
-  const patchFile = path.join(PATCH_DIR, `${index + 1}-${path.basename(targetPath)}.patch`);
-  fs.writeFileSync(patchFile, patch, 'utf8');
 
-  const applyResult = spawnSync('git', ['apply', '--allow-empty', '--whitespace=fix', patchFile], {
-    stdio: 'pipe',
-  });
-  if (applyResult.status !== 0) {
-    const stderr = applyResult.stderr ? applyResult.stderr.toString() : '';
-    throw new Error(`git apply failed for ${targetPath}: ${stderr}`);
-  }
+  const normalizedContent = content.replace(/\r\n/g, '\n');
+  const finalContent = normalizedContent.endsWith('\n') ? normalizedContent : `${normalizedContent}\n`;
+
+  fs.writeFileSync(targetPath, finalContent, 'utf8');
 
   applied.push({
     path: targetPath,

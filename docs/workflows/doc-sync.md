@@ -1,6 +1,6 @@
 # Codex Doc Sync Workflow
 
-The `codex-doc-sync` reusable workflow reviews a pull request’s diff, inspects the surrounding documentation, and lets Codex generate safe markdown patches. If Codex produces edits, the workflow commits them back to the pull request branch with `[skip ci][skip github-actions]` in the subject so CI is not retriggered.
+The `codex-doc-sync` reusable workflow reviews a pull request’s diff, inspects the surrounding documentation, and lets Codex regenerate entire markdown files when edits are required. If Codex produces updated files, the workflow commits them back to the pull request branch with `[skip ci][skip github-actions]` in the subject so CI is not retriggered.
 
 ## When to use it
 
@@ -65,7 +65,7 @@ jobs:
 1. `actions/doc-sync/context` captures the PR diff against the base branch and trims it to `max_diff_bytes`.
 2. `actions/doc-sync/prepare` enumerates docs that match `doc_globs`, scores them against the changed files, and builds markdown excerpts plus an allowlist.
 3. `actions/doc-sync/build-prompt` stitches together the shared prompt template, changed file list, diff, docs, and optional instructions.
-4. `actions/doc-sync/edit` invokes `activadee/codex-action` with the doc-sync schema. The response includes unified diff patches plus follow-up notes; a Node helper validates and applies only the allowed doc edits.
+4. `actions/doc-sync/edit` invokes `activadee/codex-action` with the doc-sync schema. The response contains complete file bodies plus follow-up notes, and a Node helper swaps in those new contents for allowed doc files.
 5. `actions/doc-sync/push` stages only the files Codex actually edited, commits them as `github-actions[bot]` with a `[skip ci][skip github-actions]` subject so other workflows do not rerun, then pushes to the PR branch.
 
 If Codex cannot confidently update a file, it simply returns an empty `edits` array (and may populate `follow_ups`). In that case the workflow exits without committing anything.

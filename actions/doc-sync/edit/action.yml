@@ -1,5 +1,5 @@
 name: "Run Codex doc sync"
-description: "Invoke Codex with the doc-sync prompt and apply resulting documentation patches."
+description: "Invoke Codex with the doc-sync prompt and apply resulting documentation updates."
 inputs:
   codex-auth-json-b64:
     description: "Base64-encoded Codex auth.json"
@@ -62,13 +62,12 @@ runs:
         effort: ${{ inputs.effort }}
         codex-args: ${{ inputs.codex-args }}
 
-    - name: Apply documentation patches
+    - name: Apply documentation updates
       shell: bash
       env:
         CODEX_DOC_SYNC_OUTPUT_PATH: ${{ inputs.output-path }}
         CODEX_DOC_SYNC_ALLOWLIST_PATH: ${{ inputs.doc-allowlist-path }}
         CODEX_DOC_SYNC_SUMMARY_PATH: doc-sync-summary.json
-        CODEX_DOC_SYNC_PATCH_DIR: doc-sync-patches
       run: |
         set -euo pipefail
         node "$GITHUB_ACTION_PATH/../lib/apply-doc-updates.js"

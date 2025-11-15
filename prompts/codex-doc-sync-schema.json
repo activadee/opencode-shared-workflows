@@ -20,7 +20,7 @@
         "type": "object",
         "required": [
           "path",
-          "patch",
+          "content",
           "justification"
         ],
         "additionalProperties": false,
@@ -29,9 +29,9 @@
             "type": "string",
             "description": "Relative path to the documentation file being edited."
           },
-          "patch": {
+          "content": {
             "type": "string",
-            "description": "Unified diff patch (--- a/path +++ b/path ...) that applies to the target file."
+            "description": "Complete replacement text for the target documentation file."
           },
           "justification": {
             "type": "string",
