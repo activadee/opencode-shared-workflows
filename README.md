@@ -111,8 +111,13 @@ Required secrets for `codex-doc-sync.yml`:
 | `go_version_file` | `go.mod` | File that specifies the Go version. |
 | `working_directory` | `.` | Directory where `go test` runs. |
 | `test_flags` | `./...` | Flags appended to `go test`. |
-| `enable_cache` | `true` | Toggle `actions/setup-go` module cache. |
+| `enable_cache` | `true` | Toggle Go module cache restoration. |
+| `cache_dependency_path` | _empty_ | Newline-delimited glob(s) hashed for cache keys. |
 | `pre_test` | _empty_ | Optional shell snippet executed before `go test`. |
+| `coverage_profile` | _empty_ | Relative path passed to `-coverprofile`. Enables coverage mode when set. |
+| `upload_coverage_artifact` | `false` | Upload the generated coverprofile via `actions/upload-artifact`. |
+| `coverage_artifact_name` | `go-coverage` | Name for the uploaded coverage artifact. |
+| `race` | `false` | Run `go test` with `-race`. |
 
 `release.yml` inputs:
 
@@ -177,6 +182,7 @@ workflows/
 workflow-templates/
 cli/
 docs/
+  workflows/
 tests/
 scripts/
 .github/

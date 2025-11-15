@@ -100,22 +100,17 @@ codex-automation-hub/
 6. Release `v1.0.0` tag that includes the modularized workflow + composites.
 
 ### 2. `go-tests.yml`
-**Current state.** Minimal workflow: checkout, `setup-go`, optional pre-test script, `go test`. No caching beyond `setup-go` built-in; no CLI equivalent.
+**Current state.** (pre-refactor) Single job: checkout, `actions/setup-go`, optional inline pre-test script, and `go test`. No structured caching toggles, coverage upload, or composable actions.
 
-**Target architecture.**
-- Composite actions under `actions/go/*`:
-  1. `setup` – reads Go version from `go.mod` or Asdf file, configures caching, optionally installs private module auth.
-  2. `prepare-workspace` – runs `pre_test` script, handles `working_directory`, installs tools (race detector dependencies, etc.).
-  3. `test` – executes `go test` with templated flags, collects coverage, and emits JUnit if needed.
-- Reusable workflow wires these composites; exposes extra inputs (coverage profile path, concurrency, caching toggles).
-- CLI command `codex go test` allows developers to reproduce the same command locally (matching env vars, coverage flags).
+**Refactor status.** Completed in branch `feature/phase0-bootstrap`:
+- Added Go-specific composites (`actions/go/setup`, `actions/go/pre-test`, `actions/go/test`) that install Go, run optional setup scripts, and execute `go test` with race + coverage support.
+- Updated `go-tests.yml` to consume those composites, expose new inputs (`cache_dependency_path`, `coverage_profile`, `upload_coverage_artifact`, `race`), and optionally upload coverage artifacts via `actions/upload-artifact`.
+  - Coverage details bubble up through outputs (`steps.run_tests.outputs.coverage_profile*`) for downstream jobs.
+- Workflow now checks out the shared automation repo (temporary until the hub is standalone) to access the new actions.
 
-**Implementation steps.**
-1. Move Go-specific logic into `actions/go/setup` (shell + `setup-go`). Support `go.sum` hashing for cache keys and additional proxies (GOPRIVATE env input).
-2. Add optional coverage/JUnit support by integrating `gotestsum` inside `actions/go/test`. Provide new workflow inputs (`coverage`, `go_test_args`, `fail_fast`).
-3. Update `workflows/go-tests.yml` to use new composites; ensure `pre_test` becomes an actual script input to `prepare-workspace` rather than inline `run`.
-4. Extend docs `docs/workflows/go-tests.md` with matrix examples (multi-version testing) and CLI parity instructions.
-5. Provide workflow template `workflow-templates/ci-go.yml` referencing this reusable workflow.
+**Follow-ups (Phase 1 Step 3).**
+1. Document the new inputs/composites in README + dedicated `docs/workflows/go-tests.md`. ✅
+2. Track next tasks: add `docs/actions/go.md` (still todo) and create `tests/actions/go-tests.yml` for actionlint/`act` coverage (todo).
 
 ### 3. `release.yml`
 **Current state.** Runs tests, fetches tags, builds prompt via bash, calls Codex, renders Markdown, optionally downloads artifacts, and publishes release via `softprops/action-gh-release`. Requires cloning this repo mid-workflow to access prompts/scripts.
