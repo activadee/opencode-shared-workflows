@@ -4,7 +4,7 @@ on:
   issues:
     types: [opened, edited]
   pull_request:
-    types: [opened, reopened, synchronize]
+    types: [opened]
 
 permissions:
   contents: read
@@ -21,7 +21,8 @@ jobs:
         with:
           command: auto-label
           max_labels: 3
-          enable_network: false
-          enable_web_search: false
+          network_access: false
+          web_search: false
         env:
           CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

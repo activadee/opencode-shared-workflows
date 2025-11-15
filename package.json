@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsup",
+    "postbuild": "node scripts/copy-codex-sdk.js",
     "dev": "tsup --watch",
     "lint": "eslint \"src/**/*.ts\"",
     "typecheck": "tsc --noEmit",

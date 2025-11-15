@@ -2,6 +2,7 @@ import type { ModelReasoningEffort, SandboxMode, ThreadEvent, ThreadItem } from 
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { readPromptFile } from './files';
 import { logger } from './logger';
 
@@ -106,7 +107,17 @@ const normalizeEffort = (value?: string): ModelReasoningEffort | undefined => {
 type CodexModule = typeof import('@openai/codex-sdk');
 type CodexInstance = InstanceType<CodexModule['Codex']>;
 
-const loadCodexModule = async () => import('@openai/codex-sdk');
+const loadCodexModule = async (): Promise<CodexModule> => {
+  try {
+    return await import('@openai/codex-sdk');
+  } catch (error) {
+    const fallbackPath = path.resolve(__dirname, 'vendor/codex-sdk/dist/index.js');
+    if (fs.existsSync(fallbackPath)) {
+      return import(pathToFileURL(fallbackPath).href) as Promise<CodexModule>;
+    }
+    throw error;
+  }
+};
 
 export class CodexClient {
   private codexInstance?: CodexInstance;

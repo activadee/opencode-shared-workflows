@@ -13,6 +13,21 @@ export default defineConfig({
   dts: true,
   shims: false,
   minify: false,
+  noExternal: [
+    '@actions/core',
+    '@actions/github',
+    '@actions/io',
+    '@actions/tool-cache',
+    '@octokit/openapi-types',
+    'commander',
+    'execa',
+    'fast-glob',
+    'fs-extra',
+    'semver',
+    'string-argv',
+    'yaml',
+    'zod'
+  ],
   outExtension() {
     return { js: '.cjs' };
   },
