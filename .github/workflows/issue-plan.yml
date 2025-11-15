@@ -1,0 +1,236 @@
+name: Codex Issue Implementation Plan
+
+on:
+  workflow_call:
+    inputs:
+      target_ref:
+        description: Branch or ref that Codex should inspect (defaults to main).
+        required: false
+        type: string
+        default: main
+      issue_number:
+        description: Optional issue number override when the triggering event is not an issue.
+        required: false
+        type: string
+        default: ""
+      prompt_extra:
+        description: Additional markdown appended to the shared prompt.
+        required: false
+        type: string
+        default: ""
+      model:
+        description: Codex model override.
+        required: false
+        type: string
+        default: gpt-5.1-codex
+      effort:
+        description: Codex reasoning effort.
+        required: false
+        type: string
+        default: high
+      safety_strategy:
+        description: Codex sandbox mode to use when invoking the Codex action.
+        required: false
+        type: string
+        default: drop-sudo
+      codex_args:
+        description: Additional CLI arguments forwarded to Codex.
+        required: false
+        type: string
+        default: '["--config","sandbox_workspace_write.network_access=true"]'
+      pass_through_env:
+        description: Comma-separated env vars forwarded to the Codex subprocess.
+        required: false
+        type: string
+        default: GH_TOKEN,GITHUB_TOKEN
+      max_issue_body_chars:
+        description: Maximum characters from the issue body to include in the prompt.
+        required: false
+        type: number
+        default: 8000
+      max_comment_body_chars:
+        description: Maximum characters per embedded issue comment.
+        required: false
+        type: number
+        default: 2000
+      max_comments:
+        description: Number of most recent comments to include.
+        required: false
+        type: number
+        default: 6
+    secrets:
+      CODEX_AUTH_JSON_B64:
+        description: Base64 encoded auth.json for Codex CLI.
+        required: true
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: issue-plan-${{ github.event.issue.number || inputs.issue_number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Draft implementation plan with Codex
+    runs-on: ubuntu-latest
+    outputs:
+      summary: ${{ steps.format.outputs.summary }}
+      plan_markdown: ${{ steps.format.outputs.plan_markdown }}
+      comment_url: ${{ steps.comment.outputs.comment_url }}
+    steps:
+      - name: Checkout repository
+        uses: activadee/codex-shared-workflows/actions/common/checkout-target@main
+        with:
+          ref: ${{ inputs.target_ref }}
+          fetch-depth: 0
+
+      - name: Prepare Codex prompt
+        id: prepare
+        uses: activadee/codex-shared-workflows/actions/issue-plan/prepare@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ inputs.issue_number }}
+          prompt-extra: ${{ inputs.prompt_extra }}
+          default-branch: ${{ inputs.target_ref }}
+          max-issue-body-chars: ${{ inputs.max_issue_body_chars }}
+          max-comment-body-chars: ${{ inputs.max_comment_body_chars }}
+          max-comments: ${{ inputs.max_comments }}
+
+      - name: Run Codex issue planner
+        id: run_codex
+        uses: activadee/codex-action@main
+        with:
+          codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
+          prompt-file: ${{ steps.prepare.outputs.prompt_path }}
+          output-file: codex-output.json
+          output-schema: ${{ steps.prepare.outputs.output_schema }}
+          safety-strategy: ${{ inputs.safety_strategy }}
+          codex-args: ${{ inputs.codex_args }}
+          model: ${{ inputs.model }}
+          effort: ${{ inputs.effort }}
+          pass-through-env: ${{ inputs.pass_through_env }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build issue comment payload
+        id: format
+        shell: bash
+        env:
+          OUTPUT_PATH: codex-output.json
+          ISSUE_NUMBER: ${{ steps.prepare.outputs.issue_number }}
+          ISSUE_URL: ${{ steps.prepare.outputs.issue_url }}
+          ISSUE_TITLE: ${{ steps.prepare.outputs.issue_title }}
+        run: |
+          set -euo pipefail
+          if [ ! -f "$OUTPUT_PATH" ]; then
+            echo "::error::Missing Codex output at $OUTPUT_PATH" >&2
+            exit 1
+          fi
+          python3 <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          output_path = Path(os.environ['OUTPUT_PATH'])
+          data = json.loads(output_path.read_text())
+
+          plan = (data.get('plan_markdown') or '').strip()
+          if not plan:
+              raise SystemExit('Codex response missing plan_markdown')
+
+          summary = (data.get('summary') or '').strip()
+          risks = [item.strip() for item in data.get('risks', []) if isinstance(item, str) and item.strip()]
+          dependencies = [item.strip() for item in data.get('dependencies', []) if isinstance(item, str) and item.strip()]
+          questions = [item.strip() for item in data.get('open_questions', []) if isinstance(item, str) and item.strip()]
+          next_steps = [item.strip() for item in data.get('next_steps', []) if isinstance(item, str) and item.strip()]
+          confidence = (data.get('confidence') or '').strip()
+          effort = (data.get('estimated_effort') or '').strip()
+
+          issue_number = os.environ.get('ISSUE_NUMBER', '').strip()
+          issue_url = os.environ.get('ISSUE_URL', '').strip()
+          issue_title_env = os.environ.get('ISSUE_TITLE', '').strip()
+          if issue_title_env:
+              issue_title = issue_title_env
+          elif issue_number:
+              issue_title = f"Issue #{issue_number}"
+          else:
+              issue_title = "Issue"
+
+          lines = ["### 🧩 Codex Implementation Plan"]
+          if issue_number:
+              display = issue_title or f"Issue #{issue_number}"
+              if issue_url:
+                  lines.append(f"**Issue:** [{display}]({issue_url}) (#{issue_number})")
+              else:
+                  lines.append(f"**Issue:** {display} (#{issue_number})")
+
+          if summary:
+              lines.append(f"**Summary:** {summary}")
+          if confidence:
+              lines.append(f"**Confidence:** {confidence}")
+          if effort:
+              lines.append(f"**Estimated Effort:** {effort}")
+
+          lines.append("")
+          lines.append(plan)
+
+          def block(label, items):
+              if not items:
+                  return None
+              joined = "\n".join(f"- {item}" for item in items)
+              return f"#### {label}\n{joined}"
+
+          for section in [
+              block("Additional Risks", risks),
+              block("Dependencies", dependencies),
+              block("Open Questions", questions),
+              block("Immediate Next Steps", next_steps),
+          ]:
+              if section:
+                  lines.append("\n" + section)
+
+          comment_text = "\n".join(lines).strip() + "\n"
+
+          comment_path = Path('issue-plan-comment.md')
+          comment_path.write_text(comment_text)
+
+          payload_path = Path('issue-plan-comment.json')
+          payload_path.write_text(json.dumps({"body": comment_text}, indent=2))
+
+          gh_output = Path(os.environ['GITHUB_OUTPUT'])
+          with gh_output.open('a') as fh:
+              fh.write(f"comment_path={comment_path}\n")
+              fh.write(f"comment_payload_path={payload_path}\n")
+              fh.write("summary<<EOF\n")
+              fh.write(summary + "\n")
+              fh.write("EOF\n")
+              fh.write("plan_markdown<<EOF\n")
+              fh.write(plan + "\n")
+              fh.write("EOF\n")
+          PY
+
+      - name: Comment on issue with gh
+        id: comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE_NUMBER: ${{ steps.prepare.outputs.issue_number }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ISSUE_NUMBER" ]; then
+            echo "::error::Unable to determine issue number" >&2
+            exit 1
+          fi
+          body_file="${{ steps.format.outputs.comment_payload_path }}"
+          if [ ! -f "$body_file" ]; then
+            echo "::error::Missing comment payload at $body_file" >&2
+            exit 1
+          fi
+          comment_url=$(gh api repos/${GITHUB_REPOSITORY}/issues/$ISSUE_NUMBER/comments \
+            --method POST \
+            --input "$body_file" \
+            --jq '.html_url')
+          echo "comment_url=$comment_url" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,289 @@
+name: "Prepare Codex issue-plan prompt"
+description: "Fetch the issue, summarize repository context, and populate the implementation-plan prompt and schema."
+inputs:
+  github-token:
+    description: "Token with `issues:read` scope for fetching issue + comments."
+    required: true
+  issue-number:
+    description: "Specific issue number to analyze (falls back to the triggering issue when blank)."
+    required: false
+    default: ""
+  prompt-extra:
+    description: "Optional markdown appended to the shared prompt."
+    required: false
+    default: ""
+  prompt-path:
+    description: "Destination path for the populated Codex prompt."
+    required: false
+    default: "codex_prompt.md"
+  template-path:
+    description: "Relative path to the prompt template."
+    required: false
+    default: "prompts/codex-issue-plan.md"
+  default-branch:
+    description: "Override for the repository default branch shown in the prompt."
+    required: false
+    default: ""
+  max-issue-body-chars:
+    description: "Maximum characters from the issue body to include."
+    required: false
+    default: "8000"
+  max-comment-body-chars:
+    description: "Maximum characters per comment excerpt."
+    required: false
+    default: "2000"
+  max-comments:
+    description: "Maximum number of recent comments to embed."
+    required: false
+    default: "6"
+outputs:
+  prompt_path:
+    description: "Path to the populated prompt file."
+    value: ${{ steps.build.outputs.prompt_path }}
+  output_schema:
+    description: "JSON schema for the Codex response."
+    value: ${{ steps.schema.outputs.schema }}
+  issue_number:
+    description: "Issue number included in the prompt."
+    value: ${{ steps.build.outputs.issue_number }}
+  issue_url:
+    description: "HTML URL for the issue (used for logging/comments)."
+    value: ${{ steps.build.outputs.issue_url }}
+  issue_title:
+    description: "Issue title for logging."
+    value: ${{ steps.build.outputs.issue_title }}
+runs:
+  using: "composite"
+  steps:
+    - id: repo
+      name: Capture repository snapshot
+      shell: bash
+      env:
+        DEFAULT_BRANCH_INPUT: ${{ inputs.default-branch }}
+        EVENT_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      run: |
+        set -euo pipefail
+        default_branch="$DEFAULT_BRANCH_INPUT"
+        if [ -z "$default_branch" ]; then
+          default_branch="$EVENT_DEFAULT_BRANCH"
+        fi
+        if [ -z "$default_branch" ]; then
+          default_branch=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF; exit}') || true
+        fi
+        if [ -z "$default_branch" ]; then
+          default_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr -d '\n') || true
+        fi
+        if [ -z "$default_branch" ]; then
+          default_branch="main"
+        fi
+
+        head_sha=$(git rev-parse HEAD 2>/dev/null | tr -d '\n') || true
+        if [ -z "$head_sha" ]; then
+          head_sha="(unknown)"
+        fi
+
+        current_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null | tr -d '\n') || true
+        if [ -z "$current_branch" ]; then
+          current_branch="(detached)"
+        fi
+
+        recent_commits=$(git --no-pager log -5 --pretty='- %h %s (%cr by %an)' 2>/dev/null) || true
+        if [ -z "$recent_commits" ]; then
+          recent_commits="(no commits available)"
+        fi
+
+        top_level=$(ls -1Ap 2>/dev/null | head -n 200) || true
+        if [ -z "$top_level" ]; then
+          top_level="(workspace listing empty)"
+        fi
+
+        echo "default_branch=$default_branch" >> "$GITHUB_OUTPUT"
+        echo "current_branch=$current_branch" >> "$GITHUB_OUTPUT"
+        echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+        {
+          echo "recent_commits<<EOF"
+          printf '%s\n' "$recent_commits"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+        {
+          echo "top_level<<EOF"
+          printf '%s\n' "$top_level"
+          echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+
+    - id: build
+      name: Build prompt from issue context
+      uses: actions/github-script@v7
+      env:
+        CODEX_SHARED_ROOT: ${{ github.action_path }}/../../..
+        PROMPT_PATH: ${{ inputs.prompt-path }}
+        TEMPLATE_PATH_INPUT: ${{ inputs.template-path }}
+        PROMPT_EXTRA: ${{ inputs.prompt-extra }}
+        ISSUE_NUMBER_INPUT: ${{ inputs.issue-number }}
+        MAX_BODY: ${{ inputs.max-issue-body-chars }}
+        MAX_COMMENT_BODY: ${{ inputs.max-comment-body-chars }}
+        MAX_COMMENTS: ${{ inputs.max-comments }}
+        REPO_TOP_LEVEL: ${{ steps.repo.outputs.top_level }}
+        RECENT_COMMITS: ${{ steps.repo.outputs.recent_commits }}
+        CURRENT_BRANCH: ${{ steps.repo.outputs.current_branch }}
+        CURRENT_HEAD: ${{ steps.repo.outputs.head_sha }}
+        DEFAULT_BRANCH: ${{ steps.repo.outputs.default_branch }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+
+          const coerceInt = (value, fallback) => {
+            const parsed = parseInt(String(value || '').trim(), 10);
+            if (Number.isNaN(parsed)) {
+              return fallback;
+            }
+            return parsed;
+          };
+
+          const trimTo = (value, limit) => {
+            if (!value) {
+              return '(not provided)';
+            }
+            const text = String(value);
+            if (!limit || limit <= 0 || text.length <= limit) {
+              return text;
+            }
+            return `${text.slice(0, limit)}\n[[truncated after ${limit} characters]]`;
+          };
+
+          const formatList = (items, fallback) => {
+            if (!items || !items.length) {
+              return fallback;
+            }
+            return items.join(', ');
+          };
+
+          const issueNumberInput = (process.env.ISSUE_NUMBER_INPUT || '').trim();
+          let issueNumber = issueNumberInput;
+          if (!issueNumber) {
+            issueNumber = context.payload.issue && context.payload.issue.number
+              ? context.payload.issue.number.toString()
+              : '';
+          }
+          if (!issueNumber) {
+            core.setFailed('issue-number input is empty and the triggering event did not include an issue payload.');
+            return;
+          }
+          const issueNumberInt = parseInt(issueNumber, 10);
+          if (Number.isNaN(issueNumberInt)) {
+            core.setFailed(`Invalid issue number: ${issueNumber}`);
+            return;
+          }
+
+          const owner = context.repo.owner;
+          const repo = context.repo.repo;
+          const { data: issue } = await github.rest.issues.get({
+            owner,
+            repo,
+            issue_number: issueNumberInt,
+          });
+
+          const allComments = await github.paginate(
+            github.rest.issues.listComments,
+            { owner, repo, issue_number: issueNumberInt, per_page: 100 }
+          );
+
+          const maxComments = Math.max(0, coerceInt(process.env.MAX_COMMENTS, 6));
+          const maxBody = coerceInt(process.env.MAX_BODY, 8000);
+          const maxCommentBody = coerceInt(process.env.MAX_COMMENT_BODY, 2000);
+
+          const commentsSlice = maxComments > 0 ? allComments.slice(-maxComments) : [];
+          const formatComment = (comment) => {
+            const author = comment.user?.login || 'unknown';
+            const timestamp = comment.created_at || comment.updated_at || 'unknown time';
+            const body = trimTo(comment.body || '(no content provided)', maxCommentBody);
+            return `**${author}** on ${timestamp} (id: ${comment.id}):\n${body}`;
+          };
+          const commentsSection = commentsSlice.length
+            ? commentsSlice.map(formatComment).join('\n\n---\n\n')
+            : '(no comments yet)';
+
+          const labelNames = (issue.labels || [])
+            .map((label) => (typeof label === 'string' ? label : label?.name))
+            .filter(Boolean);
+          const assignees = (issue.assignees || [])
+            .map((assignee) => assignee?.login)
+            .filter(Boolean);
+
+          const metadataLines = [
+            `- Issue #: ${issue.number}`,
+            `- Title: ${issue.title || '(no title)'}`,
+            `- State: ${issue.state}`,
+            `- Author: ${issue.user?.login || 'unknown'}`,
+            `- URL: ${issue.html_url}`,
+            `- Labels: ${formatList(labelNames, '(none)')}`,
+            `- Assignees: ${formatList(assignees, '(none)')}`,
+            `- Milestone: ${issue.milestone?.title || '(none)'}`,
+            `- Created: ${issue.created_at}`,
+            `- Updated: ${issue.updated_at}`,
+            `- Reactions (+1/-1/eyes/hooray): +${issue.reactions?.['+1'] || 0} / -${issue.reactions?.['-1'] || 0} / 👀 ${issue.reactions?.eyes || 0} / 🎉 ${issue.reactions?.hooray || 0}`,
+          ];
+
+          const issueBody = trimTo(issue.body || '(no body provided)', maxBody);
+
+          const sharedRoot = path.resolve(process.env.CODEX_SHARED_ROOT || path.join(__dirname, '..', '..', '..'));
+          const templatePathInput = process.env.TEMPLATE_PATH_INPUT || 'prompts/codex-issue-plan.md';
+          const templatePath = path.resolve(sharedRoot, templatePathInput);
+          if (!fs.existsSync(templatePath)) {
+            core.setFailed(`Prompt template not found at ${templatePath}`);
+            return;
+          }
+          const template = fs.readFileSync(templatePath, 'utf8');
+
+          const promptExtraRaw = (process.env.PROMPT_EXTRA || '').trim();
+          const promptExtra = promptExtraRaw ? `## Additional Caller Notes\n${promptExtraRaw}` : '';
+          const repoTopLevel = (process.env.REPO_TOP_LEVEL || '(directory listing unavailable)').trim();
+          const recentCommits = (process.env.RECENT_COMMITS || '(no commits captured)').trim();
+          const currentBranch = (process.env.CURRENT_BRANCH || '(unknown)').trim();
+          const currentHead = (process.env.CURRENT_HEAD || '(unknown)').trim();
+          const defaultBranch = (process.env.DEFAULT_BRANCH || 'main').trim();
+
+          const promptPathInput = process.env.PROMPT_PATH || 'codex_prompt.md';
+          const promptPath = path.resolve(process.cwd(), promptPathInput);
+
+          const replacements = {
+            ISSUE_METADATA: metadataLines.join('\n'),
+            ISSUE_BODY: issueBody,
+            ISSUE_COMMENTS: commentsSection,
+            REPO_FILES: repoTopLevel,
+            RECENT_COMMITS: recentCommits,
+            PROMPT_EXTRA: promptExtra,
+            CURRENT_BRANCH: currentBranch,
+            CURRENT_HEAD: currentHead,
+            DEFAULT_BRANCH: defaultBranch,
+          };
+
+          const renderTemplate = (content, map) => {
+            return Object.entries(map).reduce((acc, [key, value]) => acc.split(`{{${key}}}`).join(value), content);
+          };
+
+          const finalPrompt = renderTemplate(template, replacements);
+          fs.writeFileSync(promptPath, finalPrompt, 'utf8');
+
+          fs.writeFileSync('issue-metadata.json', JSON.stringify(issue, null, 2));
+
+          core.setOutput('prompt_path', promptPath);
+          core.setOutput('issue_number', issue.number.toString());
+          core.setOutput('issue_url', issue.html_url || '');
+          core.setOutput('issue_title', issue.title || '');
+
+          core.info(`Prepared implementation-plan prompt for ${owner}/${repo}#${issue.number}`);
+
+    - id: schema
+      name: Load output schema
+      shell: bash
+      env:
+        CODEX_SHARED_ROOT: ${{ github.action_path }}/../../..
+      run: |
+        set -euo pipefail
+        schema=$(jq -c . "$CODEX_SHARED_ROOT/prompts/codex-issue-plan-schema.json")
+        echo "schema=$schema" >> "$GITHUB_OUTPUT"
