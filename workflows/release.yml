@@ -151,16 +151,9 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.target }}
 
-      - name: Checkout shared automation assets
-        uses: actions/checkout@v5
-        with:
-          repository: activadee/codex-shared-workflows
-          ref: ${{ github.action_ref || 'main' }}
-          path: __codex_shared
-
       - name: Set up Go
         if: inputs.run_tests
-        uses: ./__codex_shared/actions/go/setup
+        uses: activadee/codex-shared-workflows/actions/go/setup@main
         with:
           go-version: ${{ inputs.go_version }}
           go-version-file: ${{ inputs.go_version_file }}
@@ -169,7 +162,7 @@ jobs:
 
       - name: Pre-test setup
         if: inputs.run_tests
-        uses: ./__codex_shared/actions/go/pre-test
+        uses: activadee/codex-shared-workflows/actions/go/pre-test@main
         with:
           script: ${{ inputs.pre_test }}
           working-directory: ${{ inputs.test_working_directory }}
@@ -177,7 +170,7 @@ jobs:
       - name: Run tests
         if: inputs.run_tests
         id: run_tests
-        uses: ./__codex_shared/actions/go/test
+        uses: activadee/codex-shared-workflows/actions/go/test@main
         with:
           working-directory: ${{ inputs.test_working_directory }}
           test-flags: ${{ inputs.test_flags }}
@@ -194,13 +187,13 @@ jobs:
 
       - name: Determine release range
         id: range
-        uses: ./__codex_shared/actions/release/determine-range
+        uses: activadee/codex-shared-workflows/actions/release/determine-range@main
         with:
           tag-pattern: ${{ inputs.tag_pattern }}
 
       - name: Prepare Codex prompt
         id: prompt
-        uses: ./__codex_shared/actions/release/prepare-prompt
+        uses: activadee/codex-shared-workflows/actions/release/prepare-prompt@main
         with:
           tag-name: ${{ inputs.tag_name }}
           range-description: ${{ steps.range.outputs.range_description }}
@@ -209,7 +202,7 @@ jobs:
 
       - name: Generate release highlights with Codex
         id: codex
-        uses: ./__codex_shared/actions/release/generate-highlights
+        uses: activadee/codex-shared-workflows/actions/release/generate-highlights@main
         with:
           codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
           prompt-path: ${{ steps.prompt.outputs.prompt_path }}
@@ -221,7 +214,7 @@ jobs:
 
       - name: Render release notes
         id: render_notes
-        uses: ./__codex_shared/actions/release/render-notes
+        uses: activadee/codex-shared-workflows/actions/release/render-notes@main
         with:
           codex-output-path: ${{ steps.codex.outputs.output_path }}
           notes-path: release-notes.md

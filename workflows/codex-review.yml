@@ -59,27 +59,20 @@ jobs:
       - name: Fetch base reference
         run: git fetch --no-tags origin ${{ github.event.pull_request.base.ref }}
 
-      - name: Checkout shared workflow assets
-        uses: actions/checkout@v5
-        with:
-          repository: activadee/codex-shared-workflows
-          ref: ${{ github.action_ref || 'main' }}
-          path: __codex_shared
-
       - name: Collect review inputs
-        uses: ./__codex_shared/actions/codex-review/collect-context
+        uses: activadee/codex-shared-workflows/actions/codex-review/collect-context@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Prepare Codex prompt
         id: prepare_prompt
-        uses: ./__codex_shared/actions/codex-review/prepare-prompt
+        uses: activadee/codex-shared-workflows/actions/codex-review/prepare-prompt@main
         with:
           prompt-extra: ${{ inputs.prompt_extra }}
 
       - name: Run Codex review
         id: run_codex
-        uses: ./__codex_shared/actions/codex-review/run-review
+        uses: activadee/codex-shared-workflows/actions/codex-review/run-review@main
         with:
           codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
           prompt-path: ${{ steps.prepare_prompt.outputs.prompt_path }}
@@ -90,13 +83,13 @@ jobs:
           codex-args: ${{ inputs.codex_args }}
 
       - name: Normalize Codex review output
-        uses: ./__codex_shared/actions/codex-review/normalize-output
+        uses: activadee/codex-shared-workflows/actions/codex-review/normalize-output@main
         with:
           output-path: ${{ steps.run_codex.outputs.output_path }}
 
       - name: Submit review
         if: success()
-        uses: ./__codex_shared/actions/codex-review/submit-review
+        uses: activadee/codex-shared-workflows/actions/codex-review/submit-review@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           review-file: review-comments.json

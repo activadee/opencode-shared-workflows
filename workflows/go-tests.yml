@@ -70,15 +70,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Checkout shared automation assets
-        uses: actions/checkout@v5
-        with:
-          repository: activadee/codex-shared-workflows
-          ref: ${{ github.action_ref || 'main' }}
-          path: __codex_shared
-
       - name: Set up Go
-        uses: ./__codex_shared/actions/go/setup
+        uses: activadee/codex-shared-workflows/actions/go/setup@main
         with:
           go-version: ${{ inputs.go_version }}
           go-version-file: ${{ inputs.go_version_file }}
@@ -86,14 +79,14 @@ jobs:
           cache-dependency-path: ${{ inputs.cache_dependency_path }}
 
       - name: Pre-test setup
-        uses: ./__codex_shared/actions/go/pre-test
+        uses: activadee/codex-shared-workflows/actions/go/pre-test@main
         with:
           script: ${{ inputs.pre_test }}
           working-directory: ${{ inputs.working_directory }}
 
       - name: Run go test
         id: run_tests
-        uses: ./__codex_shared/actions/go/test
+        uses: activadee/codex-shared-workflows/actions/go/test@main
         with:
           working-directory: ${{ inputs.working_directory }}
           test-flags: ${{ inputs.test_flags }}

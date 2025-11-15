@@ -51,23 +51,16 @@ jobs:
       - name: Checkout target repository
         uses: actions/checkout@v5
 
-      - name: Checkout shared workflow assets
-        uses: actions/checkout@v5
-        with:
-          repository: activadee/codex-shared-workflows
-          ref: ${{ github.action_ref || 'main' }}
-          path: __codex_shared
-
       - name: Prepare Codex auto-label assets
         id: prepare
-        uses: ./__codex_shared/actions/auto-label/prepare
+        uses: activadee/codex-shared-workflows/actions/auto-label/prepare@main
         with:
           max-labels: ${{ inputs.max_labels }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Generate labels with Codex
         id: run_codex
-        uses: ./__codex_shared/actions/auto-label/run
+        uses: activadee/codex-shared-workflows/actions/auto-label/run@main
         with:
           codex-auth-json-b64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
           prompt-path: codex_prompt.md
@@ -80,7 +73,7 @@ jobs:
 
       - name: Apply labels
         id: apply
-        uses: ./__codex_shared/actions/auto-label/apply
+        uses: activadee/codex-shared-workflows/actions/auto-label/apply@main
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           max-labels: ${{ steps.prepare.outputs.max-labels }}
