@@ -48,7 +48,7 @@ runs:
       run: |
         template="$TEMPLATE_PATH_INPUT"
         if [ ! -f "$template" ]; then
-          alt="$ACTION_ROOT/../../$TEMPLATE_PATH_INPUT"
+          alt="$ACTION_ROOT/../../../$TEMPLATE_PATH_INPUT"
           if [ -f "$alt" ]; then
             template="$alt"
           fi
