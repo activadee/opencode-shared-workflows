@@ -13,6 +13,10 @@ inputs:
   doc-allowlist-path:
     description: "Path to the JSON file enumerating allowed documentation files."
     required: true
+  doc-globs:
+    description: "Original newline-delimited documentation globs for reference in the prompt."
+    required: false
+    default: ""
   prompt-extra:
     description: "Optional markdown appended at the end of the prompt."
     required: false
@@ -39,6 +43,7 @@ runs:
         CHANGED_FILES_PATH: ${{ inputs.changed-files-path }}
         DOC_CONTEXT_PATH: ${{ inputs.doc-context-path }}
         DOC_ALLOWLIST_PATH: ${{ inputs.doc-allowlist-path }}
+        DOC_GLOBS_FOR_PROMPT: ${{ inputs.doc-globs }}
         PROMPT_EXTRA: ${{ inputs.prompt-extra }}
         PROMPT_PATH: ${{ inputs.prompt-path }}
       run: |
@@ -80,6 +85,18 @@ runs:
           jq -r '.[] | "- " + .' "$DOC_ALLOWLIST_PATH" >> "$PROMPT_PATH"
         else
           echo '- (no documentation files matched the globs)' >> "$PROMPT_PATH"
+        fi
+
+        echo '' >> "$PROMPT_PATH"
+        echo 'You may also create new markdown files if their paths match the globs below:' >> "$PROMPT_PATH"
+
+        echo '' >> "$PROMPT_PATH"
+        echo '## Documentation globs' >> "$PROMPT_PATH"
+        echo '' >> "$PROMPT_PATH"
+        if [ -n "$DOC_GLOBS_FOR_PROMPT" ]; then
+          printf '%s\n' "$DOC_GLOBS_FOR_PROMPT" >> "$PROMPT_PATH"
+        else
+          echo '(no additional globs provided)' >> "$PROMPT_PATH"
         fi
 
         echo '' >> "$PROMPT_PATH"

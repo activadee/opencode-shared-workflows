@@ -20,7 +20,7 @@ The workflow requests `contents: write` to push commits and `pull-requests: read
 
 | Name | Default | Purpose |
 | --- | --- | --- |
-| `doc_globs` | `docs/**/*.md`, `README.md`, `*.md`, ... | Newline-delimited globs that define which files count as documentation. |
+| `doc_globs` | `docs/**/*.md`, `README.md`, `*.md`, ... | Newline-delimited globs that define which files count as documentation. Codex may create new markdown files if they match these globs. |
 | `max_doc_files` | `12` | Max number of doc files to embed into the prompt. |
 | `max_doc_chars` | `6000` | Snippet length per doc file. |
 | `max_total_chars` | `60000` | Combined length of all excerpts. |

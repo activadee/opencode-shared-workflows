@@ -125,6 +125,7 @@ jobs:
           changed-files-path: ${{ steps.context.outputs.changed_files_path }}
           doc-context-path: ${{ steps.prepare.outputs.doc_context_path }}
           doc-allowlist-path: ${{ steps.prepare.outputs.doc_allowlist_path }}
+          doc-globs: ${{ inputs.doc_globs }}
           prompt-extra: ${{ inputs.prompt_extra }}
 
       - name: Run Codex doc sync
