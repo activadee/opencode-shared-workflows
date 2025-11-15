@@ -65,7 +65,7 @@ jobs:
 1. Check out the caller’s repository at `inputs.target_ref` so Codex can inspect files under `main`.
 2. `actions/issue-plan/prepare` fetches the issue + latest comments via the GitHub API, truncates long bodies, captures a repository snapshot (top-level tree, recent commits, HEAD SHA), and populates `prompts/codex-issue-plan.md` plus its JSON schema.
 3. `activadee/codex-action` runs GPT-5.1-codex in high-effort mode with `--config sandbox_workspace_write.network_access=true`, forwarding `GH_TOKEN` so Codex can call `gh` if it needs extra details.
-4. A short Python step validates the JSON response, creates the final markdown comment (including any risks/dependencies/questions arrays), and generates a JSON payload file.
+4. `actions/issue-plan/format-comment` validates the JSON response, creates the final markdown comment (including any risks/dependencies/questions arrays), and generates a JSON payload file.
 5. The workflow posts the comment back to the source issue using `gh api repos/{owner}/{repo}/issues/{number}/comments --method POST --input <payload>`, capturing the resulting `html_url` as a workflow output.
 
 ## Requirements & limitations

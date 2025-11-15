@@ -251,6 +251,7 @@ actions/
     edit/
   issue-plan/
     prepare/
+    format-comment/
 workflows/
 workflow-templates/
 cli/
