@@ -46,7 +46,8 @@
       "items": {
         "type": "object",
         "required": [
-          "description"
+          "description",
+          "owner_hint"
         ],
         "additionalProperties": false,
         "properties": {
