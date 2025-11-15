@@ -5,7 +5,7 @@ Reusable GitHub Actions workflows for Codex-enabled repositories. These workflow
 ## Workflows
 
 - `.github/workflows/codex-review.yml`  
-  Runs a Codex-powered pull request review. It collects PR context, executes `activadee/codex-action`, normalizes the output, and posts inline review comments plus a summary.
+  Runs a Codex-powered pull request review. It collects PR context, executes `activadee/codex-action`, normalizes the output, and updates a sticky summary comment with the latest findings checklist.
 
 - `.github/workflows/go-tests.yml`  
   Installs Go, caches dependencies, and executes `go test` with configurable flags.

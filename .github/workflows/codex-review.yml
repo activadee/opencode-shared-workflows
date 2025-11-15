@@ -117,4 +117,3 @@ jobs:
             codex_prompt.md
             codex-output.json
             review-comments.json
-            skipped-comments.json

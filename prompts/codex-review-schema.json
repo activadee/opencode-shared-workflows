@@ -5,31 +5,42 @@
       "type": "string",
       "description": "High-level summary of the review findings."
     },
-    "comments": {
+    "findings": {
       "type": "array",
+      "description": "List of high-level findings Codex identified.",
       "items": {
         "type": "object",
+        "required": ["title", "details", "severity", "resolved", "files"],
+        "additionalProperties": false,
         "properties": {
-          "path": {
+          "title": {
             "type": "string",
-            "description": "File path relative to the repository root."
+            "description": "Short label for the finding."
           },
-          "line": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "Line number in the diff hunk."
-          },
-          "body": {
+          "details": {
             "type": "string",
-            "description": "Markdown-formatted inline comment describing the issue."
+            "description": "Markdown description of the issue and guidance to fix it."
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "high", "medium", "low", "info"],
+            "description": "Relative priority of the finding."
+          },
+          "resolved": {
+            "type": "boolean",
+            "description": "True when the issue is already fixed in the latest diff."
+          },
+          "files": {
+            "type": "array",
+            "description": "Optional list of file or file:line references related to the finding.",
+            "items": {
+              "type": "string"
+            }
           }
-        },
-        "required": ["path", "line", "body"],
-        "additionalProperties": false
-      },
-      "description": "Collection of inline review comments produced by Codex."
+        }
+      }
     }
   },
-  "required": ["summary", "comments"],
+  "required": ["summary", "findings"],
   "additionalProperties": false
 }
