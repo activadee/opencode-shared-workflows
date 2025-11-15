@@ -196,7 +196,7 @@ export const registerDocSyncCommand = (program: Command) => {
         promptPath: path.resolve(opts.promptPath),
         model: opts.model,
         effort: opts.effort,
-        sandboxMode: "workspace-write",
+        sandboxMode: "danger-full-access",
         approvalPolicy: 'untrusted',
         extraEnv,
         networkAccessEnabled: Boolean(opts.enableNetwork),
