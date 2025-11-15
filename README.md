@@ -160,13 +160,25 @@ prompts/
   codex-auto-label.md
   codex-auto-label-schema.json
   codex-doc-sync.md
-actions/                # Placeholder for modular composites (Phase 0 scaffolding).
-workflows/              # Will host next-gen reusable workflows.
-workflow-templates/     # Future starter workflows exposed via GitHub UI.
-cli/                    # Workspace for Codex CLI / gh extension sources.
-docs/                   # In-flight documentation hub for actions + CLI.
-tests/                  # Action + CLI automated tests.
-scripts/                # Helper scripts (validation, sync tooling).
+actions/
+  common/
+    checkout-target/
+    checkout-shared/
+  codex-review/
+    collect-context/
+    prepare-prompt/
+    run-review/
+    normalize-output/
+    submit-review/
+    lib/
+      normalize-review.cjs
+      submit-review.js
+workflows/
+workflow-templates/
+cli/
+docs/
+tests/
+scripts/
 .github/
   actions/
     codex-collect/
@@ -174,16 +186,14 @@ scripts/                # Helper scripts (validation, sync tooling).
     auto-label-apply/
     doc-sync-*/
   scripts/
-    codex/
-      normalize-review.cjs
-      submit-review.js
+    doc-sync/
   workflows/
     codex-review.yml
     go-tests.yml
     release.yml
     auto-label.yml
     codex-doc-sync.yml
-plan.md                 # Refactor blueprint (Phase 0 deliverable).
+plan.md
 ```
 
 ## Refactor roadmap

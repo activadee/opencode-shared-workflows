@@ -191,6 +191,17 @@ codex-automation-hub/
    - Open PRs in consuming repos switching to new tags.
    - Deprecate `activadee/codex-shared-workflows` once adoption >90%.
 
+## Phase Tracking
+
+- [x] **Phase 0 – Bootstrap:** scaffolding directories created, prompts relocated, roadmap captured (commit `feature/phase0-bootstrap`).
+- [ ] **Phase 1 – Common foundation:**
+  - [x] Create `actions/common/*` and `actions/codex-review/*` scaffolding; migrate review scripts into `actions/codex-review/lib/`.
+  - [x] Update `codex-review.yml` to consume the new composites (still using local checkout until remote pinning strategy is finalized).
+  - [ ] Publish guidance/tests ensuring the new composites work under `workflow_call` consumers.
+- [ ] **Phase 2 – Rework remaining workflows**
+- [ ] **Phase 3 – CLI + templates**
+- [ ] **Phase 4 – Adoption / deprecation**
+
 ---
 
 ## Acceptance Criteria
