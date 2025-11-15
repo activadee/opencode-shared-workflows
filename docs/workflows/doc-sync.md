@@ -79,4 +79,5 @@ If Codex cannot confidently update a file, it leaves the working tree untouched,
 - The workflow only pushes updates if the provided `GITHUB_TOKEN` (or whatever token you grant via `actions/checkout`) has write access to the pull request branch. For PRs originating from forks, grant permissions explicitly or disable the auto-commit step.
 - Codex edits are restricted to files that match `doc_globs`, preventing accidental code changes.
 - `pass_through_env` forwards `GH_TOKEN`/`GITHUB_TOKEN` into the Codex subprocess. Treat those credentials with the same care you would in a regular workflow step.
+- Codex may create new markdown files when necessary as long as their paths match `doc_globs`; make sure downstream tooling (lint, docs build) tolerates new files.
 - Need different sandbox behavior? Override the `codex_args` input to add or remove `--config` entries (for example, set `[]` to disable the default network flag).
