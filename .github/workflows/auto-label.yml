@@ -3,13 +3,10 @@ name: Codex Auto Label
 on:
   issues:
     types: [opened, edited]
-  pull_request:
-    types: [opened]
 
 permissions:
   contents: read
   issues: write
-  pull-requests: write
 
 jobs:
   label:
@@ -21,7 +18,7 @@ jobs:
         with:
           command: auto-label
           max_labels: 3
-          network_access: false
+          network_access: true
           web_search: false
         env:
           CODEX_AUTH_JSON_B64: ${{ secrets.CODEX_AUTH_JSON_B64 }}
