@@ -77,10 +77,10 @@ runs:
             abs_path="$(realpath -m "$COVERAGE_PROFILE")"
           else
             abs_path="$(python3 - <<'PY'
-import os
-print(os.path.abspath(os.path.normpath(os.environ['COVERAGE_PROFILE'])))
-PY
-)"
+            import os
+            print(os.path.abspath(os.path.normpath(os.environ['COVERAGE_PROFILE'])))
+            PY
+            )"
           fi
         fi
         {
