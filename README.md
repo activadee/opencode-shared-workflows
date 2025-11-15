@@ -16,8 +16,6 @@ Reusable GitHub Actions workflows for Codex-enabled repositories. These workflow
 - `.github/workflows/auto-label.yml`  
   Calls Codex to suggest up to three labels for new or updated issues, creating labels when needed.
 
-- `.github/workflows/codex-doc-sync.yml`  
-  Runs Codex in a dedicated job to edit and commit documentation changes, then hands off to a follow-up job that applies the generated bundle and pushes it to the PR branch while posting the doc summary.
 
 ## Using the workflows
 
@@ -87,10 +85,6 @@ Required secrets for `release.yml`:
 Required secrets for `auto-label.yml`:
 
 - `CODEX_AUTH_JSON_B64` – Codex credentials for label generation.
-
-Required secrets for `codex-doc-sync.yml`:
-
-- `CODEX_AUTH_JSON_B64` – Codex credentials for analyzing diffs and editing documentation.
 
 ### Optional inputs
 
@@ -164,15 +158,6 @@ Outputs:
 | `codex_args` | _empty_ | Extra CLI arguments forwarded to `codex exec`. |
 | `create_missing_labels` | `true` | Allow creating labels that don’t exist yet. |
 
-`codex-doc-sync.yml` inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `doc_globs` | `docs/**`, `**/*.md`, `README*` | Newline-separated glob list that defines which files count as documentation. |
-| `safety_strategy` | `drop-sudo` | Passed directly to `activadee/codex-action` (the workflow always runs with `sandbox: danger-full-access`). |
-| `model` / `effort` | _empty_ | Optional overrides for Codex model and reasoning effort. |
-| `codex_args` | _empty_ | Additional CLI arguments forwarded to `codex exec`. |
-
 ## Repository layout
 
 ```
@@ -183,7 +168,6 @@ prompts/
   codex-release-schema.json
   codex-auto-label.md
   codex-auto-label-schema.json
-  codex-doc-sync.md
 actions/
   common/
     checkout-target/
@@ -225,7 +209,6 @@ scripts/
     go-tests.yml
     release.yml
     auto-label.yml
-    codex-doc-sync.yml
 plan.md
 ```
 

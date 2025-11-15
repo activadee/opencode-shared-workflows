@@ -35,25 +35,17 @@ codex-automation-hub/
       prepare/
       run/
       apply/
-    doc-sync/
-      context/
-      prepare/
-      build-prompt/
-      edit/
-      push/
   workflows/
     codex-review.yml
     go-tests.yml
     release.yml
     auto-label.yml
-    codex-doc-sync.yml
   workflow-templates/
     pr-review-template.yml
     ci-template.yml
     release-template.yml
   cli/
     cmd/codex-review
-    cmd/codex-doc-sync
     cmd/codex-release
   docs/
     workflows/
@@ -132,18 +124,6 @@ codex-automation-hub/
 1. Add advanced filtering (`allowlist`/`blocklist`) and dry-run previews to the apply step before rolling out CLI parity.
 2. Create `tests/actions/auto-label.yml` to smoke-test the workflow via `act`.
 
-### 5. `codex-doc-sync.yml`
-**Status.** Refactor complete:
-- Scripts now live under `actions/doc-sync/lib` and power the new composites (`context`, `prepare`, `build-prompt`, `edit`, `push`). Legacy `.github/actions/doc-sync-*` delegate to the new versions.
-- Workflow references the published composites (`activadee/codex-shared-workflows/actions/doc-sync/*@tag`) and keeps branch pinning via `github.action_ref`.
-- Documentation scope + commit summary logic stays the same but is easier to consume elsewhere; future CLI work can call these composites directly.
-
-**Follow-ups.**
-1. Add dry-run support / manifest outputs before enabling CLI parity.
-2. Author `tests/actions/doc-sync.yml` for `actionlint` + `act` smoke testing once fixtures exist.
-
----
-
 ## Migration Strategy & Timeline
 1. **Phase 0 – Bootstrap (Weeks 1-2).**
    - Clone existing repo into `codex-automation-hub` inside org.
@@ -154,7 +134,7 @@ codex-automation-hub/
    - Release `codex-review` v0 beta tag and validate with internal repo.
 3. **Phase 2 – Rework remaining workflows (Weeks 3-5).**
    - Tackle `go-tests` and `release` (simpler) first.
-   - Follow with `auto-label` and `codex-doc-sync` once shared libraries are stable.
+   - Follow with `auto-label` once shared libraries are stable.
 4. **Phase 3 – CLI + templates (Weeks 5-6).**
    - Implement CLI commands using shared libraries.
    - Publish workflow templates + migration docs.
@@ -173,7 +153,6 @@ codex-automation-hub/
   - [x] Modularize `go-tests.yml` (actions/go, docs/workflows/go-tests.md, README/plan updates); `act` tests intentionally skipped for now.
   - [x] Modularize `release.yml` (actions/release, docs/workflows/release.md, README/plan updates); `act` tests intentionally skipped for now.
   - [x] Refactor `auto-label.yml` (actions/auto-label, docs/workflows/auto-label.md); extra filtering + tests deferred.
-  - [x] Refactor `codex-doc-sync.yml` (actions/doc-sync, docs/workflows/codex-doc-sync.md); dry-run/tests deferred.
 - [ ] **Phase 3 – CLI + templates**
 - [ ] **Phase 4 – Adoption / deprecation**
 
