@@ -66,7 +66,7 @@ jobs:
 2. `actions/doc-sync/prepare` enumerates docs that match `doc_globs`, scores them against the changed files, and builds markdown excerpts plus an allowlist.
 3. `actions/doc-sync/build-prompt` stitches together the shared prompt template, changed file list, diff, docs, and optional instructions.
 4. `actions/doc-sync/edit` invokes `activadee/codex-action` with the doc-sync schema. The response includes unified diff patches plus follow-up notes; a Node helper validates and applies only the allowed doc edits.
-5. `actions/doc-sync/push` commits the changes as `github-actions[bot]` using a `[skip ci][skip github-actions]` subject so other workflows do not rerun, then pushes to the PR branch.
+5. `actions/doc-sync/push` stages only the files Codex actually edited, commits them as `github-actions[bot]` with a `[skip ci][skip github-actions]` subject so other workflows do not rerun, then pushes to the PR branch.
 
 If Codex cannot confidently update a file, it simply returns an empty `edits` array (and may populate `follow_ups`). In that case the workflow exits without committing anything.
 

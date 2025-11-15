@@ -25,6 +25,10 @@ inputs:
     description: "Branch name to push to (defaults to pull request head ref)."
     required: false
     default: ""
+  applied-files:
+    description: "JSON array of files that Codex edited."
+    required: false
+    default: ""
 outputs:
   pushed:
     description: "\"true\" if a commit was created and pushed."
@@ -42,6 +46,7 @@ runs:
         COMMITTER_NAME: ${{ inputs.committer-name }}
         COMMITTER_EMAIL: ${{ inputs.committer-email }}
         HEAD_REF_INPUT: ${{ inputs.head-ref }}
+        APPLIED_FILES_JSON: ${{ inputs.applied-files }}
       run: |
         set -euo pipefail
         if [ "${CHANGES_APPLIED}" != "true" ]; then
@@ -52,7 +57,21 @@ runs:
         git config user.name "$COMMITTER_NAME"
         git config user.email "$COMMITTER_EMAIL"
 
-        git add -A
+        if [ -n "$APPLIED_FILES_JSON" ]; then
+          mapfile -t applied_paths < <(printf '%s' "$APPLIED_FILES_JSON" | jq -r '.[]' 2>/dev/null || true)
+        else
+          applied_paths=()
+        fi
+
+        if [ ${#applied_paths[@]} -gt 0 ]; then
+          for path in "${applied_paths[@]}"; do
+            if [ -n "$path" ] && [ -f "$path" ]; then
+              git add "$path"
+            fi
+          done
+        else
+          git add -A
+        fi
 
         if git diff --cached --quiet; then
           echo "::notice::No staged changes detected after Codex edits. Skipping push."

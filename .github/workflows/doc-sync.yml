@@ -140,3 +140,4 @@ jobs:
           changes-applied: ${{ steps.edit.outputs.changes_applied }}
           summary-path: ${{ steps.edit.outputs.summary_path }}
           commit-message: ${{ inputs.commit_message }}
+          applied-files: ${{ steps.edit.outputs.applied_files }}
