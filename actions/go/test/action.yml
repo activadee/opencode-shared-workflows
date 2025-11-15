@@ -76,11 +76,7 @@ runs:
           if command -v realpath >/dev/null 2>&1; then
             abs_path="$(realpath -m "$COVERAGE_PROFILE")"
           else
-            abs_path="$(python3 - <<'PY'
-            import os
-            print(os.path.abspath(os.path.normpath(os.environ['COVERAGE_PROFILE'])))
-            PY
-            )"
+            abs_path="$(python3 -c "import os; print(os.path.abspath(os.path.normpath(os.environ['COVERAGE_PROFILE'])))")"
           fi
         fi
         {
