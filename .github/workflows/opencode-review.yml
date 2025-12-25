@@ -38,8 +38,6 @@ jobs:
     if: github.event.pull_request != null && github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    env:
-      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -72,4 +70,3 @@ jobs:
           model: ${{ inputs.model }}
           prompt: ${{ steps.prompt.outputs.prompt }}
           share: ${{ inputs.share }}
-          use_github_token: true
