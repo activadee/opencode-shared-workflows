@@ -1,0 +1,72 @@
+name: OpenCode Review
+
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: Model to use for review
+        required: false
+        type: string
+        default: zai-coding-plan/glm-4.7
+      fallback_model:
+        description: Fallback model if primary fails
+        required: false
+        type: string
+        default: opencode/big-pickle
+      share:
+        description: Share the OpenCode session
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      ZHIPU_API_KEY:
+        description: Z.AI API key for GLM models
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: opencode-review-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Review PR with OpenCode
+    if: github.event.pull_request != null && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Checkout shared workflows
+        uses: actions/checkout@v4
+        with:
+          repository: activadee/opencode-shared-workflows
+          path: .opencode-shared
+          sparse-checkout: |
+            prompts/review.md
+            opencode.json
+
+      - name: Load review prompt
+        id: prompt
+        run: |
+          PROMPT=$(cat .opencode-shared/prompts/review.md)
+          echo "prompt<<EOF" >> $GITHUB_OUTPUT
+          echo "$PROMPT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Run OpenCode review
+        uses: sst/opencode/github@latest
+        env:
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+        with:
+          model: ${{ inputs.model }}
+          prompt: ${{ steps.prompt.outputs.prompt }}
+          share: ${{ inputs.share }}

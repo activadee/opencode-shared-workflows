@@ -1,0 +1,60 @@
+name: OpenCode Label
+
+on:
+  workflow_call:
+    inputs:
+      model:
+        description: Model to use for labeling
+        required: false
+        type: string
+        default: zai-coding-plan/glm-4.7
+      fallback_model:
+        description: Fallback model if primary fails
+        required: false
+        type: string
+        default: opencode/big-pickle
+    secrets:
+      ZHIPU_API_KEY:
+        description: Z.AI API key for GLM models
+        required: false
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+jobs:
+  label:
+    name: Label issue with OpenCode
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Checkout shared workflows
+        uses: actions/checkout@v4
+        with:
+          repository: activadee/opencode-shared-workflows
+          path: .opencode-shared
+          sparse-checkout: prompts/label.md
+
+      - name: Load label prompt
+        id: prompt
+        run: |
+          PROMPT=$(cat .opencode-shared/prompts/label.md)
+          echo "prompt<<EOF" >> $GITHUB_OUTPUT
+          echo "$PROMPT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Run OpenCode labeling
+        uses: sst/opencode/github@latest
+        env:
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+        with:
+          model: ${{ inputs.model }}
+          prompt: |
+            ${{ steps.prompt.outputs.prompt }}
+            
+            Apply appropriate labels to issue #${{ github.event.issue.number }}.
+          share: false

@@ -1,30 +1,31 @@
-# Codex Shared Workflows
+# OpenCode Shared Workflows
 
-Reusable GitHub Actions workflows for Codex-enabled repositories. These workflows live in their own repository so multiple projects can invoke them via `workflow_call` while centralizing prompts, scripts, and configuration.
+Reusable GitHub Actions workflows powered by [OpenCode](https://opencode.ai) for automated code review, issue labeling, and documentation sync.
 
 ## Workflows
 
-- `.github/workflows/codex-review.yml`  
-  Runs a Codex-powered pull request review. It collects PR context, executes `activadee/codex-action`, normalizes the output, and updates a sticky summary comment with the latest findings checklist.
+| Workflow | Purpose | Trigger |
+|----------|---------|---------|
+| `opencode-review.yml` | AI-powered PR code review | `pull_request` events |
+| `opencode-label.yml` | Automatic issue labeling | `issues` events |
+| `opencode-doc-sync.yml` | Sync documentation with code changes | `pull_request` events |
+| `opencode-interactive.yml` | Slash-command handler (`/oc`, `/opencode`) | `issue_comment`, `pull_request_review_comment` |
 
-- `.github/workflows/go-tests.yml`  
-  Installs Go, caches dependencies, and executes `go test` with configurable flags.
+## Quick Start
 
-- `.github/workflows/release.yml`  
-  Generates release notes with Codex and publishes a GitHub release, optionally running `go test` first.
+### 1. Install OpenCode GitHub App
 
-- `.github/workflows/auto-label.yml`  
-  Calls Codex to suggest up to three labels for new or updated issues, creating labels when needed.
+Visit https://github.com/apps/opencode-agent and install it on your repository.
 
-- `.github/workflows/doc-sync.yml`  
-  Invokes Codex on pull requests to review the current diff, edit the necessary documentation files, and push a `[skip ci][skip github-actions]` commit directly from the workflow (no follow-up jobs needed). Network access stays enabled inside the sandbox because the workflow passes `--config sandbox_workspace_write.network_access=true` through `codex-args`, so Codex can reach web search or `gh` without falling back to `danger-full-access`.
+### 2. Add API Key Secret
 
-- `.github/workflows/issue-plan.yml`  
-  Reads an issue plus repository context on `main`, has Codex (GPT-5.1-codex / high effort with network access) draft an implementation plan, and posts that plan back to the issue via the GitHub CLI using the forwarded `GH_TOKEN`.
+Add `ZHIPU_API_KEY` to your repository secrets (Settings → Secrets → Actions).
 
-## Using the workflows
+Get your API key from [Z.AI Coding Plan](https://z.ai/subscribe).
 
-Create a workflow in another repository and reference the desired file via `uses`. Pin to a tag or commit once published.
+### 3. Create Workflows
+
+#### PR Review (Auto-triggered)
 
 ```yaml
 # .github/workflows/pr-review.yml
@@ -32,265 +33,123 @@ name: PR Review
 
 on:
   pull_request:
-    types: [opened, reopened, synchronize, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review]
 
 jobs:
-  codex-review:
-    uses: activadee/codex-shared-workflows/.github/workflows/codex-review.yml@v1
+  review:
+    uses: activadee/opencode-shared-workflows/.github/workflows/opencode-review.yml@main
     secrets: inherit
-    with:
-      prompt_extra: |
-        Prioritize security regressions and user-facing bugs.
-
-  auto-label:
-    uses: activadee/codex-shared-workflows/.github/workflows/auto-label.yml@v1
-    secrets: inherit
-    with:
-      max_labels: 3
 ```
+
+#### Issue Labeling (Auto-triggered)
 
 ```yaml
-# .github/workflows/ci.yml
-name: CI
+# .github/workflows/issue-label.yml
+name: Issue Label
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  issues:
+    types: [opened, edited]
 
 jobs:
-  go-tests:
-    uses: activadee/codex-shared-workflows/.github/workflows/go-tests.yml@v1
-    with:
-      go_version_file: go.mod
-      test_flags: ./... -race -count=1
-
-  release:
-    uses: activadee/codex-shared-workflows/.github/workflows/release.yml@v1
+  label:
+    uses: activadee/opencode-shared-workflows/.github/workflows/opencode-label.yml@main
     secrets: inherit
-    with:
-      tag_name: v0.2.0
-      target: main
-      release_title: Codex SDK v0.2.0
-      draft: false
 ```
+
+#### Doc Sync (Auto-triggered)
+
+```yaml
+# .github/workflows/doc-sync.yml
+name: Doc Sync
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  sync:
+    uses: activadee/opencode-shared-workflows/.github/workflows/opencode-doc-sync.yml@main
+    secrets: inherit
+```
+
+#### Interactive (Slash Commands)
+
+```yaml
+# .github/workflows/opencode.yml
+name: OpenCode
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+jobs:
+  opencode:
+    uses: activadee/opencode-shared-workflows/.github/workflows/opencode-interactive.yml@main
+    secrets: inherit
+```
+
+## Configuration
+
+### Inputs
+
+All workflows accept these optional inputs:
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `model` | `zai-coding-plan/glm-4.7` | Primary AI model |
+| `fallback_model` | `opencode/big-pickle` | Fallback if primary fails |
 
 ### Secrets
 
-Reusable workflows cannot access secrets from the workflow repository. Define required secrets in each calling repository (or at the organization/environment level) and forward them with `secrets: inherit` or explicit mappings.
+| Secret | Required | Description |
+|--------|----------|-------------|
+| `ZHIPU_API_KEY` | Yes | Z.AI API key for GLM models |
 
-Required secrets for `codex-review.yml`:
+### Model Options
 
-- `CODEX_AUTH_JSON_B64` – Base64-encoded Codex `auth.json` (from ChatGPT subscription auth). The default `GITHUB_TOKEN` is available automatically.
+- **`zai-coding-plan/glm-4.7`** - Z.AI's latest model (200K context, free with Coding Plan)
+- **`opencode/big-pickle`** - OpenCode's free model (200K context, no API key needed)
 
-Required secrets for `release.yml`:
+## Slash Commands
 
-- `CODEX_AUTH_JSON_B64` – Shared Codex credentials for generating release notes.
+When using `opencode-interactive.yml`, users can trigger OpenCode by commenting:
 
-Required secrets for `auto-label.yml`:
-
-- `CODEX_AUTH_JSON_B64` – Codex credentials for label generation.
-
-Required secrets for `doc-sync.yml`:
-
-- `CODEX_AUTH_JSON_B64` – Codex credentials used to generate documentation updates.
-
-Required secrets for `issue-plan.yml`:
-
-- `CODEX_AUTH_JSON_B64` – Codex credentials for drafting the implementation plan (the workflow also relies on the caller-provided `GITHUB_TOKEN`/`GH_TOKEN` to read and comment on issues).
-
-### Optional inputs
-
-`codex-review.yml` accepts the following inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `safety_strategy` | `drop-sudo` | Passed through to the action. |
-| `prompt_extra` | _empty_ | Additional markdown appended to the shared prompt. |
-| `model` / `effort` | _empty_ | Optional overrides for Codex model and reasoning effort. |
-| `codex_args` | _empty_ | Extra flags forwarded to `codex exec`. |
-
-`go-tests.yml` inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `go_version` | _empty_ | Direct Go version; ignored if `go_version_file` is present. |
-| `go_version_file` | `go.mod` | File that specifies the Go version. |
-| `working_directory` | `.` | Directory where `go test` runs. |
-| `test_flags` | `./...` | Flags appended to `go test`. |
-| `enable_cache` | `true` | Toggle Go module cache restoration. |
-| `cache_dependency_path` | _empty_ | Newline-delimited glob(s) hashed for cache keys. |
-| `pre_test` | _empty_ | Optional shell snippet executed before `go test`. |
-| `coverage_profile` | _empty_ | Relative path passed to `-coverprofile`. Enables coverage mode when set. |
-| `upload_coverage_artifact` | `false` | Upload the generated coverprofile via `actions/upload-artifact`. |
-| `coverage_artifact_name` | `go-coverage` | Name for the uploaded coverage artifact. |
-| `race` | `false` | Run `go test` with `-race`. |
-
-`release.yml` inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `tag_name` | _(required)_ | Tag to publish (e.g. `v1.2.3`). |
-| `release_title` | _empty_ | Optional display name (falls back to tag). |
-| `target` | `main` | Commit/branch to release. |
-| `draft` | `false` | Whether to create the release as a draft. |
-| `go_version` | _empty_ | Explicit Go version; ignored if `go_version_file` is provided. |
-| `go_version_file` | `go.mod` | File declaring Go version. |
-| `run_tests` | `true` | Run `go test` before release. |
-| `test_flags` | `./...` | Flags passed to `go test`. |
-| `enable_cache` | `true` | Enable Go module cache for pre-release tests. |
-| `cache_dependency_path` | _empty_ | Newline-delimited glob list hashed for cache keys. |
-| `test_working_directory` | `.` | Directory where `go test` runs. |
-| `pre_test` | _empty_ | Shell snippet executed before `go test`. |
-| `coverage_profile` | _empty_ | Adds `-coverprofile` and stores the file at this path. |
-| `upload_coverage_artifact` | `false` | Upload the generated coverprofile artifact. |
-| `coverage_artifact_name` | `release-coverage` | Artifact name when uploading coverage. |
-| `race` | `false` | Run `go test` with `-race`. |
-| `download_artifacts` | `false` | Download workflow artifacts before publishing the release. |
-| `artifacts_path` | `release-artifacts` | Directory for downloaded artifacts. |
-| `artifact_glob` | _empty_ | Newline-delimited glob(s) (relative to the workspace after download) uploaded with the release. |
-| `tag_pattern` | `v*` | Pattern used to find the previous release tag. |
-| `prompt_extra` | _empty_ | Markdown appended to the Codex prompt. |
-| `codex_model` | _empty_ | Optional Codex model override. |
-| `codex_effort` | _empty_ | Optional reasoning effort override. |
-| `codex_args` | _empty_ | Extra flags forwarded to `codex exec`. |
-| `codex_safety_strategy` | `drop-sudo` | Safety strategy for Codex (drop-sudo/read-only/etc.). |
-
-Outputs:
-
-- `release_notes` – Markdown generated for the release.
-
-`auto-label.yml` inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `max_labels` | `3` | Upper bound (1–3) on labels applied to each issue. |
-| `model` | `gpt-5.1-codex-mini` | Codex model used for label generation (cost-optimized default). |
-| `effort` | `medium` | Codex reasoning effort. |
-| `safety_strategy` | `drop-sudo` | Sandbox mode for Codex. |
-| `codex_args` | _empty_ | Extra CLI arguments forwarded to `codex exec`. |
-| `create_missing_labels` | `true` | Allow creating labels that don’t exist yet. |
-
-`issue-plan.yml` inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `target_ref` | `main` | Branch/ref that Codex should analyze when building the plan. |
-| `issue_number` | _empty_ | Override when the calling workflow is not triggered by an issue event. |
-| `prompt_extra` | _empty_ | Additional markdown appended after the shared prompt template. |
-| `model` | `gpt-5.1-codex` | Codex model used for planning. |
-| `effort` | `high` | Reasoning effort passed to Codex. |
-| `safety_strategy` | `drop-sudo` | Codex sandbox mode. |
-| `codex_args` | `["--config","sandbox_workspace_write.network_access=true"]` | Ensures Codex keeps workspace-write sandboxing but has outbound network (for issue lookup/search). |
-| `pass_through_env` | `GH_TOKEN,GITHUB_TOKEN` | Env vars forwarded into Codex so it can run `gh`/`git` commands as needed. |
-| `max_issue_body_chars` | `8000` | Max characters copied from the issue body. |
-| `max_comment_body_chars` | `2000` | Max characters per embedded comment. |
-| `max_comments` | `6` | Number of the most recent comments appended to the prompt. |
-
-Outputs:
-
-- `summary` – Short synopsis returned by Codex.
-- `plan_markdown` – Full markdown plan that was posted to the issue.
-- `comment_url` – Link to the GitHub comment created via `gh`.
-
-`doc-sync.yml` inputs:
-
-| Input | Default | Notes |
-| --- | --- | --- |
-| `doc_globs` | see workflow | Newline-delimited globs that define editable documentation files. |
-| `max_doc_files` | `12` | Caps how many doc files are embedded into the prompt at once. |
-| `max_doc_chars` | `6000` | Max characters taken from each doc snippet. |
-| `max_total_chars` | `60000` | Upper bound on combined doc snippet length. |
-| `max_diff_bytes` | `600000` | Truncates the git diff fed to Codex to control prompt size. |
-| `prompt_extra` | _empty_ | Additional markdown appended to the shared doc-sync prompt. |
-| `safety_strategy` | `drop-sudo` | Passed to `activadee/codex-action`. |
-| `model` | `gpt-5.1-codex-mini` | Default Codex model used for doc sync (can be overridden explicitly). |
-| `effort` | _empty_ | Optional reasoning effort override. |
-| `codex_args` | _empty_ | Extra CLI flags forwarded to `codex exec`. |
-| `pass_through_env` | `GH_TOKEN,GITHUB_TOKEN` | Env vars forwarded to Codex so it can run `git`/`gh` commands with the right credentials. |
-
-## LLM model configuration
-
-To reduce token usage and standardize behavior, the following reusable workflows default to a small, cost-efficient model (`gpt-5.1-codex-mini`):
-
-- Labeling: `.github/workflows/auto-label.yml` (input `model`)
-- Release notes: `.github/workflows/release.yml` (input `codex_model`)
-- Doc sync: `.github/workflows/doc-sync.yml` (input `model`)
-
-These defaults are defined directly in the workflow YAML and composite actions so they are visible and easy to audit. Repositories that consume these workflows may add their own validation (for example, a small shell script in CI) if they want to enforce or periodically check the configured model.
-
-Using a larger model for these workflows is an explicit, opt-in choice: callers may override the model via the inputs above (for example, `with: { model: "gpt-5.1" }` on auto-label or doc-sync, or `codex_model` on release). When doing so, prefer short-lived experiments and document the rationale in the calling repository to account for increased token usage.
-
-## Repository layout
-
-``` bash
-prompts/
-  codex-review.md
-  codex-review-schema.json
-  codex-release-template.md
-  codex-release-schema.json
-  codex-auto-label.md
-  codex-auto-label-schema.json
-  codex-issue-plan.md
-  codex-issue-plan-schema.json
-actions/
-  common/
-    checkout-target/
-    checkout-shared/
-  codex-review/
-    collect-context/
-    prepare-prompt/
-    run-review/
-    normalize-output/
-    submit-review/
-    lib/
-      normalize-review.cjs
-      submit-review.js
-  auto-label/
-    prepare/
-    run/
-    apply/
-  release/
-    determine-range/
-    prepare-prompt/
-    generate-highlights/
-    render-notes/
-  doc-sync/
-    context/
-    prepare/
-    build-prompt/
-    edit/
-  issue-plan/
-    prepare/
-    format-comment/
-workflows/
-workflow-templates/
-cli/
-docs/
-  workflows/
-tests/
-scripts/
-.github/
-  workflows/
-    codex-review.yml
-    go-tests.yml
-    release.yml
-    auto-label.yml
-plan.md
+```
+/oc explain this issue
+/opencode fix this bug
+/oc review this PR
 ```
 
-## Refactor roadmap
+## Repository Structure
 
-- **Phase 0 (current):** establish automation-hub scaffolding directories and centralize prompts under `prompts/` so downstream assets can consume them without cloning `.github/prompts`. Track work in `plan.md`.
-- **Upcoming phases:** migrate each workflow into modular composites, add workflow templates + CLI surface, expand docs/tests, and cut a `v1.0.0` release once all assets live in the new layout.
+```
+opencode-shared-workflows/
+├── .github/workflows/
+│   ├── opencode-review.yml
+│   ├── opencode-label.yml
+│   ├── opencode-doc-sync.yml
+│   └── opencode-interactive.yml
+├── prompts/
+│   ├── review.md
+│   ├── label.md
+│   └── doc-sync.md
+├── docs/
+│   ├── setup.md
+│   └── workflows/
+├── opencode.json
+└── README.md
+```
 
-## Development
+## Documentation
 
-1. Duplicate the workflows into a feature branch and modify as needed.
-2. Use a sandbox repository to consume the branch ref (`@feature-branch`) and verify behavior.
-3. Once validated, tag a release (e.g., `v1.0.0`) so downstream repos can pin to an immutable reference.
+- [Setup Guide](docs/setup.md)
+- [Review Workflow](docs/workflows/review.md)
+- [Label Workflow](docs/workflows/label.md)
+- [Doc Sync Workflow](docs/workflows/doc-sync.md)
 
-## Limitations
+## License
 
-- GitHub does not allow reusable workflows to access secrets or protected variables defined in this repository. Consumers must define required secrets themselves or inherit them from an organization/environment.
-- The review workflow assumes a pull request event; if invoked from other events, required context such as `github.event.pull_request` is missing and the workflow will exit early.
+MIT

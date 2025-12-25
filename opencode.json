@@ -1,0 +1,52 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "zai-coding-plan": {
+      "models": {
+        "glm-4.7": {}
+      }
+    }
+  },
+  "agent": {
+    "review": {
+      "description": "Reviews pull requests for correctness, security, and maintainability",
+      "mode": "primary",
+      "model": "zai-coding-plan/glm-4.7",
+      "prompt": "{file:./prompts/review.md}",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": true
+      }
+    },
+    "label": {
+      "description": "Suggests and applies labels to GitHub issues",
+      "mode": "primary",
+      "model": "zai-coding-plan/glm-4.7",
+      "prompt": "{file:./prompts/label.md}",
+      "tools": {
+        "write": false,
+        "edit": false,
+        "bash": true
+      }
+    },
+    "doc-sync": {
+      "description": "Updates documentation to match code changes",
+      "mode": "primary",
+      "model": "zai-coding-plan/glm-4.7",
+      "prompt": "{file:./prompts/doc-sync.md}",
+      "tools": {
+        "write": true,
+        "edit": true,
+        "bash": true
+      },
+      "permission": {
+        "bash": {
+          "git commit*": "allow",
+          "git push*": "allow",
+          "*": "ask"
+        }
+      }
+    }
+  }
+}
