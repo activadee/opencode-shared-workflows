@@ -17,14 +17,14 @@ on:
         description: Share the OpenCode session
         required: false
         type: boolean
-        default: true
+        default: false
     secrets:
       MINIMAX_API_KEY:
         description: MiniMax API key
         required: false
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   id-token: write
 
