@@ -54,7 +54,9 @@ jobs:
                   OPENCODE_PERMISSION: >
                       {"bash": {"gh issue*": "allow", "*": "deny"}, "webfetch": "deny"}
               run: |
-                  opencode run -m ${{ inputs.model }} -p .opencode-shared/prompts/label.md << 'EOF'
+                  opencode run -m ${{ inputs.model }} << 'EOF'
+                  $(cat .opencode-shared/prompts/label.md)
+
                   Apply appropriate labels to issue #$ISSUE_NUMBER.
 
                   Issue title: $ISSUE_TITLE
