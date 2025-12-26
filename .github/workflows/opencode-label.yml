@@ -1,60 +1,62 @@
 name: OpenCode Label
 
 on:
-  workflow_call:
-    inputs:
-      model:
-        description: Model to use for labeling
-        required: false
-        type: string
-        default: minimax/MiniMax-M2.1
-      fallback_model:
-        description: Fallback model if primary fails
-        required: false
-        type: string
-        default: opencode/big-pickle
-    secrets:
-      MINIMAX_API_KEY:
-        description: MiniMax API key
-        required: false
+    workflow_call:
+        inputs:
+            model:
+                description: Model to use for labeling
+                required: false
+                type: string
+                default: minimax/MiniMax-M2.1
+            fallback_model:
+                description: Fallback model if primary fails
+                required: false
+                type: string
+                default: opencode/big-pickle
+        secrets:
+            MINIMAX_API_KEY:
+                description: MiniMax API key
+                required: false
 
 permissions:
-  contents: read
-  issues: write
-  id-token: write
+    contents: read
+    issues: write
+    id-token: write
 
 jobs:
-  label:
-    name: Label issue with OpenCode
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    label:
+        name: Label issue with OpenCode
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 1
 
-      - name: Checkout shared workflows
-        uses: actions/checkout@v4
-        with:
-          repository: activadee/opencode-shared-workflows
-          path: .opencode-shared
-          sparse-checkout: prompts/label.md
+            - name: Checkout shared workflows
+              uses: actions/checkout@v4
+              with:
+                  repository: activadee/opencode-shared-workflows
+                  path: .opencode-shared
+                  sparse-checkout: prompts/label.md
 
-      - name: Load label prompt
-        id: prompt
-        run: |
-          PROMPT=$(cat .opencode-shared/prompts/label.md)
-          echo "prompt<<EOF" >> $GITHUB_OUTPUT
-          echo "$PROMPT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+            - name: Install OpenCode
+              run: curl -fsSL https://opencode.ai/install | bash
 
-      - name: Run OpenCode labeling
-        uses: sst/opencode/github@latest
-        env:
-          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
-        with:
-          model: ${{ inputs.model }}
-          prompt: |
-            ${{ steps.prompt.outputs.prompt }}
-            
-            Apply appropriate labels to issue #${{ github.event.issue.number }}.
-          share: false
+            - name: Label issue with OpenCode
+              env:
+                  MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  ISSUE_NUMBER: ${{ github.event.issue.number }}
+                  ISSUE_TITLE: ${{ github.event.issue.title }}
+                  ISSUE_BODY: ${{ github.event.issue.body }}
+                  OPENCODE_PERMISSION: >
+                      {"bash": {"gh issue*": "allow", "*": "deny"}, "webfetch": "deny"}
+              run: |
+                  opencode run -m ${{ inputs.model }} -p .opencode-shared/prompts/label.md << 'EOF'
+                  Apply appropriate labels to issue #$ISSUE_NUMBER.
+
+                  Issue title: $ISSUE_TITLE
+                  Issue body: $ISSUE_BODY
+                  EOF
