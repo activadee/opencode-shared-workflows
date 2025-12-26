@@ -1,9 +1,9 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "provider": {
-    "zai-coding-plan": {
+    "minimax": {
       "models": {
-        "glm-4.7": {}
+        "MiniMax-M2.1": {}
       }
     }
   },
@@ -11,7 +11,7 @@
     "review": {
       "description": "Reviews pull requests for correctness, security, and maintainability",
       "mode": "primary",
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "minimax/MiniMax-M2.1",
       "prompt": "{file:./prompts/review.md}",
       "tools": {
         "write": false,
@@ -22,7 +22,7 @@
     "label": {
       "description": "Suggests and applies labels to GitHub issues",
       "mode": "primary",
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "minimax/MiniMax-M2.1",
       "prompt": "{file:./prompts/label.md}",
       "tools": {
         "write": false,
@@ -33,7 +33,7 @@
     "doc-sync": {
       "description": "Updates documentation to match code changes",
       "mode": "primary",
-      "model": "zai-coding-plan/glm-4.7",
+      "model": "minimax/MiniMax-M2.1",
       "prompt": "{file:./prompts/doc-sync.md}",
       "tools": {
         "write": true,

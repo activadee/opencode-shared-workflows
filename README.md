@@ -19,9 +19,9 @@ Visit https://github.com/apps/opencode-agent and install it on your repository.
 
 ### 2. Add API Key Secret
 
-Add `ZHIPU_API_KEY` to your repository secrets (Settings → Secrets → Actions).
+Add `MINIMAX_API_KEY` to your repository secrets (Settings → Secrets → Actions).
 
-Get your API key from [Z.AI Coding Plan](https://z.ai/subscribe).
+Get your API key from [MiniMax](https://api.minimax.com).
 
 ### 3. Create Workflows
 
@@ -99,18 +99,18 @@ All workflows accept these optional inputs:
 
 | Input | Default | Description |
 |-------|---------|-------------|
-| `model` | `zai-coding-plan/glm-4.7` | Primary AI model |
+| `model` | `minimax/MiniMax-M2.1` | Primary AI model |
 | `fallback_model` | `opencode/big-pickle` | Fallback if primary fails |
 
 ### Secrets
 
 | Secret | Required | Description |
 |--------|----------|-------------|
-| `ZHIPU_API_KEY` | Yes | Z.AI API key for GLM models |
+| `MINIMAX_API_KEY` | Yes | MiniMax API key |
 
 ### Model Options
 
-- **`zai-coding-plan/glm-4.7`** - Z.AI's latest model (200K context, free with Coding Plan)
+- **`minimax/MiniMax-M2.1`** - MiniMax's M2.1 model (200K context)
 - **`opencode/big-pickle`** - OpenCode's free model (200K context, no API key needed)
 
 ## Slash Commands

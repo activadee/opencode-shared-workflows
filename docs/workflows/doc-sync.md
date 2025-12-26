@@ -30,14 +30,14 @@ jobs:
 
 | Input | Type | Default | Description |
 |-------|------|---------|-------------|
-| `model` | string | `zai-coding-plan/glm-4.7` | AI model to use |
+| `model` | string | `minimax/MiniMax-M2.1` | AI model to use |
 | `fallback_model` | string | `opencode/big-pickle` | Fallback model |
 
 ## Secrets
 
 | Secret | Required | Description |
 |--------|----------|-------------|
-| `ZHIPU_API_KEY` | Yes | Z.AI API key |
+| `MINIMAX_API_KEY` | Yes | MiniMax API key |
 
 ## Behavior
 
