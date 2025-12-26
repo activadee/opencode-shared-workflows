@@ -4,11 +4,13 @@ The `opencode-review.yml` workflow provides AI-powered code review for pull requ
 
 ## Overview
 
-When a pull request is opened or updated, this workflow:
+When a pull request is ready for review, this workflow:
 1. Checks out the repository
-2. Loads the review prompt from this repository
-3. Runs OpenCode to analyze the changes
-4. Posts review comments on the PR
+2. Installs OpenCode via curl
+3. Fetches PR details using GitHub API
+4. Loads the review prompt from this repository
+5. Runs OpenCode to analyze the changes
+6. Posts line-specific review comments on the PR using gh CLI
 
 ## Usage
 
@@ -32,7 +34,7 @@ jobs:
 |-------|------|---------|-------------|
 | `model` | string | `minimax/MiniMax-M2.1` | AI model to use |
 | `fallback_model` | string | `opencode/big-pickle` | Fallback model |
-| `share` | boolean | `true` | Share the OpenCode session |
+| `share` | boolean | `false` | Share the OpenCode session |
 
 ## Secrets
 
@@ -44,10 +46,12 @@ jobs:
 
 The review workflow:
 - Only runs on non-draft pull requests
+- Installs OpenCode via `curl -fsSL https://opencode.ai/install | bash`
+- Fetches PR title, description, and commit SHA via `gh` API
+- Creates line-specific comments on files for violations
+- Comments "lgtm" if no significant issues found
 - Focuses on correctness, security, stability, and maintainability
-- Provides specific feedback with file and line references
-- Suggests fixes for identified issues
-- Rates severity (critical/high/medium/low)
+- Avoids style zealotry - only flags style issues that hide bugs or cause confusion
 
 ## Customization
 
@@ -76,7 +80,10 @@ jobs:
 ## Prompt
 
 The review prompt is located at [`prompts/review.md`](../../prompts/review.md) and instructs OpenCode to:
+
 - Review only changes in the PR
-- Prioritize correctness and security
-- Provide actionable feedback
-- Approve if no significant issues found
+- Prioritize correctness, security, stability, and maintainability
+- Create line-specific comments using the gh CLI
+- Avoid style zealotry
+- Comment "lgtm" if no violations found
+- Rate severity (critical/high/medium/low)
