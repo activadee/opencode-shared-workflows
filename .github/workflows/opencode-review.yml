@@ -53,6 +53,15 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Install dependencies
+        run: |
+          if ! command -v gh &> /dev/null; then
+            curl -fsSL https://cli.github.com/packages.sh | sudo bash
+          fi
+          if ! command -v jq &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
       - name: Install OpenCode
         run: curl -fsSL https://opencode.ai/install | bash
 
@@ -78,7 +87,6 @@ jobs:
 
       - name: Check PR guidelines compliance
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
           OPENCODE_PERMISSION: '{ "bash": { "gh*": "allow", "gh pr review*": "deny", "*": "deny" } }'
