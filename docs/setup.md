@@ -22,8 +22,8 @@ The GitHub App enables OpenCode to interact with issues, pull requests, and comm
 1. Get your API key from [Z.AI](https://z.ai/subscribe)
 2. Go to your repository's **Settings** → **Secrets and variables** → **Actions**
 3. Click **New repository secret**
-4. Name: `ZHIPU_API_KEY`
-5. Value: Your Z.AI API key
+4. Name: `MINIMAX_API_KEY`
+5. Value: Your MiniMax API key
 6. Click **Add secret**
 
 ## Step 3: Create Workflow Files
@@ -84,7 +84,7 @@ See the [README](../README.md) for individual workflow examples.
 
 If you encounter issues:
 - Check the **Actions** tab for workflow run logs
-- Verify the `ZHIPU_API_KEY` secret is correctly set
+- Verify the `MINIMAX_API_KEY` secret is correctly set
 - Ensure the OpenCode GitHub App is installed on the repository
 
 ## Configuration Options
@@ -106,7 +106,7 @@ jobs:
 
 | Model | Provider | Context | Notes |
 |-------|----------|---------|-------|
-| `zai-coding-plan/glm-4.7` | Z.AI | 200K | Default, free with Coding Plan |
+| `minimax/MiniMax-M2.1` | MiniMax | 200K | Default |
 | `opencode/big-pickle` | OpenCode | 200K | Free, no API key needed |
 
 ## Troubleshooting
@@ -119,7 +119,7 @@ jobs:
 
 ### API key errors
 
-- Ensure `ZHIPU_API_KEY` is set in repository secrets
+- Ensure `MINIMAX_API_KEY` is set in repository secrets
 - Verify the API key is valid and has not expired
 - Check that `secrets: inherit` is included in the job
 
